@@ -113,7 +113,7 @@ static void register_free(void)
 static int heap_size(int argc, char **argv)
 {
     uint32_t heap_size = heap_caps_get_minimum_free_size(MALLOC_CAP_32BIT);
-    printf("min heap size: %u", heap_size);
+    printf("min heap size: %u\n", heap_size);
     return 0;
 }
 
