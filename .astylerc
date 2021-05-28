@@ -6,5 +6,5 @@ indent-preprocessor
 align-pointer=name
 align-reference=name
 convert-tabs
-max-code-length=120
+max-code-length=80
 suffix=none # no backup files
