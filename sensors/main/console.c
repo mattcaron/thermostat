@@ -1,6 +1,6 @@
 /**
  * @file
- * 
+ *
  * Console parser implementation.
  */
 
@@ -40,15 +40,15 @@ static void initialize_console(void)
     /* Configure UART.
      */
     uart_config_t uart_config = {
-            .baud_rate = CONFIG_ESP_CONSOLE_UART_BAUDRATE,
-            .data_bits = UART_DATA_8_BITS,
-            .parity = UART_PARITY_DISABLE,
-            .stop_bits = UART_STOP_BITS_1,
+        .baud_rate = CONFIG_ESP_CONSOLE_UART_BAUDRATE,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
     };
 
     /* Install UART driver for interrupt-driven reads and writes */
     ESP_ERROR_CHECK( uart_driver_install(CONFIG_ESP_CONSOLE_UART_NUM,
-            256, 0, 0, NULL, 0) );
+                                         256, 0, 0, NULL, 0) );
     ESP_ERROR_CHECK( uart_param_config(CONFIG_ESP_CONSOLE_UART_NUM, &uart_config) );
 
     /* Tell VFS to use UART driver */
@@ -56,10 +56,10 @@ static void initialize_console(void)
 
     /* Initialize the console */
     esp_console_config_t console_config = {
-            .max_cmdline_args = 8,
-            .max_cmdline_length = 256,
+        .max_cmdline_args = 8,
+        .max_cmdline_length = 256,
 #if CONFIG_LOG_COLORS
-            .hint_color = atoi(LOG_COLOR_CYAN)
+        .hint_color = atoi(LOG_COLOR_CYAN)
 #endif
     };
     ESP_ERROR_CHECK( esp_console_init(&console_config) );
@@ -72,7 +72,7 @@ static void initialize_console(void)
 
     /* Tell linenoise where to get command completions and hints */
     linenoiseSetCompletionCallback(&esp_console_get_completion);
-    linenoiseSetHintsCallback((linenoiseHintsCallback*) &esp_console_get_hint);
+    linenoiseSetHintsCallback((linenoiseHintsCallback *) &esp_console_get_hint);
 
     /* Set command history size */
     linenoiseHistorySetMaxLen(100);
@@ -103,7 +103,7 @@ static void console_task(void *pvParameters)
     /* Prompt to be printed before each line.
      * This can be customized, made dynamic, etc.
      */
-    const char* prompt = LOG_COLOR_I "sensor> " LOG_RESET_COLOR;
+    const char *prompt = LOG_COLOR_I "sensor> " LOG_RESET_COLOR;
 
     printf("\n"
            LOG_COLOR(LOG_COLOR_BLUE)
@@ -133,7 +133,7 @@ static void console_task(void *pvParameters)
         /* Get a line using linenoise.
          * The line is returned when ENTER is pressed.
          */
-        char* line = linenoise(prompt);
+        char *line = linenoise(prompt);
         if (line == NULL) { /* Ignore empty lines */
             continue;
         }
