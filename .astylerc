@@ -1,0 +1,10 @@
+style=1tbs
+indent=spaces=4
+indent-namespaces
+indent-switches
+indent-preprocessor
+align-pointer=name
+align-reference=name
+convert-tabs
+max-code-length=120
+suffix=none # no backup files
