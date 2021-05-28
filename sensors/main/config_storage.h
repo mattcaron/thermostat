@@ -1,0 +1,31 @@
+/**
+ * @file
+ * Header file for config_storage.c.
+ */
+
+#ifndef __CONFIG_STORAGE_H_
+#define __CONFIG_STORAGE_H_
+
+#include "esp_wifi_types.h"
+
+#define MAX_STATION_NAME 64
+
+typedef struct {
+    char ssid[MAX_SSID_LEN+1];
+    char pass[MAX_PASSPHRASE_LEN+1];
+    char station_name[MAX_STATION_NAME+1];
+    // TODO: Add MQTT channel(s)
+} config_storage_t;
+
+/**
+ * Read a config from NVS.
+ * @param [out] config Reference to configuration structure to
+ *                     receive current config. Note that this will
+ *                     be zeroed before being populated.
+ *
+ * @return true on success.
+ * @return false on failure.
+ */
+bool read_config_from_nvs(config_storage_t *config);
+
+#endif // __CONFIG_STORAGE_H_

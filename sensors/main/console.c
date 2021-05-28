@@ -18,6 +18,7 @@
 
 #include "console.h"
 #include "cmd_system.h"
+#include "cmd_config.h"
 #include "priorities.h"
 
 /**
@@ -99,6 +100,7 @@ static void console_task(void *pvParameters)
     /* Register commands */
     esp_console_register_help_command();
     register_system();
+    register_configure();
 
     /* Prompt to be printed before each line.
      * This can be customized, made dynamic, etc.
