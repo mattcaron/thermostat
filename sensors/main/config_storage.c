@@ -51,7 +51,8 @@ bool read_config_from_nvs(config_storage_t *config)
          * necessary, just an open and close.
          */
         ESP_ERROR_CHECK(nvs_open(NVS_CONFIG_NAMESPACE, NVS_READWRITE, &handle));
-    } else {
+    }
+    else {
         // Catch any other errors not related to it not being there.
         ESP_ERROR_CHECK(ret);
 

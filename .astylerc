@@ -1,4 +1,5 @@
 style=1tbs
+break-closing-brackets
 indent=spaces=4
 indent-namespaces
 indent-switches

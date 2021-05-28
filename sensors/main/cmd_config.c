@@ -30,7 +30,8 @@ static int tasks_config(int argc, char **argv)
         printf("\tStation: \t%s\n", config.station_name);
         printf("\tSSID:    \t%s\n", config.ssid);
         printf("\tPassword:\t%s\n", config.pass);
-    } else {
+    }
+    else {
         printf("Error reading config\n");
         return 1;
     }
