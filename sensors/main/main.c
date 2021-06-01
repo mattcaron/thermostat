@@ -15,6 +15,10 @@
 
 #include "console.h"
 #include "cmd_system.h"
+#include "config_storage.h"
+#include "wifi.h"
+
+static const char *TAG = "main";
 
 /**
  * Initialize nonvolatile storage.
@@ -36,6 +40,15 @@ static void initialize_nvs(void)
 void app_main(void)
 {
     initialize_nvs();
+
+    // read config pre-zeroes the structure passed in, so there's no explicit
+    // need to zero current_config on boot.
+    if (read_config_from_nvs(&current_config)) {
+        initialize_wifi(&current_config);
+    }
+    else {
+        ESP_LOGE(TAG, "Error reading NVS config - no configuration applied.");
+    }
 
     start_console();
 }

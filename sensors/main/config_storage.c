@@ -18,8 +18,22 @@
 #define NVS_PASS_NAME "pass"
 #define NVS_STATION_NAME "sta"
 
-esp_err_t read_config_string_from_nvs(nvs_handle handle, const char *key,
-                                      char *value, size_t buflen)
+config_storage_t current_config;
+
+config_storage_t new_config;
+
+/**
+ * Helper function to read a config string from NVS.
+ *
+ * @param handle [in]  handle to open NVS partition.
+ * @param key    [in]  key whose value to retrieve.
+ * @param value  [out] buffer to receive the value.
+ * @param buflen [out] length of value, in bytes.
+ *
+ * @return an esp_err_t result as returned from nvs_get_str.
+ */
+static esp_err_t read_config_string_from_nvs(nvs_handle handle, const char *key,
+        char *value, size_t buflen)
 {
     // API docs say length includes NUL, so we don't want to subtract 1 in all
     // of these calculations.
@@ -60,10 +74,34 @@ bool read_config_from_nvs(config_storage_t *config)
         ESP_ERROR_CHECK(read_config_string_from_nvs(handle, NVS_SSID_NAME,
                         config->ssid, sizeof(config->ssid)));
         ESP_ERROR_CHECK(read_config_string_from_nvs(handle, NVS_PASS_NAME,
-                        config->ssid, sizeof(config->ssid)));
+                        config->pass, sizeof(config->pass)));
         ESP_ERROR_CHECK(read_config_string_from_nvs(handle, NVS_STATION_NAME,
                         config->station_name, sizeof(config->station_name)));
     }
+
+    nvs_close(handle);
+
+    return true;
+}
+
+bool write_config_to_nvs(config_storage_t *config)
+{
+    nvs_handle handle;
+    esp_err_t ret;
+
+    ret = nvs_open(NVS_CONFIG_NAMESPACE, NVS_READWRITE, &handle);
+
+    ESP_ERROR_CHECK(ret);
+
+    // Write out our config items.
+    ESP_ERROR_CHECK(nvs_set_str(handle, NVS_SSID_NAME,
+                                config->ssid));
+    ESP_ERROR_CHECK(nvs_set_str(handle, NVS_PASS_NAME,
+                                config->pass));
+    ESP_ERROR_CHECK(nvs_set_str(handle, NVS_STATION_NAME,
+                                config->station_name));
+
+    nvs_commit(handle);
 
     nvs_close(handle);
 
