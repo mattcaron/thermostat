@@ -11,6 +11,7 @@
 #include "esp_console.h"
 #include "argtable3/argtable3.h"
 #include "config_storage.h"
+#include "console.h"
 #include "wifi.h"
 
 static const char *TAG = "cmd_config";
@@ -202,6 +203,7 @@ static bool handle_save()
         // Shadow current config to new config (so they are the same)
         memcpy(&new_config, &current_config, sizeof(new_config));
 
+        set_console_prompt_text();
         stop_wifi();
         start_wifi(&current_config);
 

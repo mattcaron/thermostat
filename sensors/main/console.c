@@ -19,8 +19,32 @@
 #include "console.h"
 #include "cmd_system.h"
 #include "cmd_config.h"
+#include "config_storage.h"
 #include "cmd_wifi.h"
 #include "priorities.h"
+
+// Plain prompt is the station name with a >, a space, and a NUL.
+char plain_prompt[MAX_STATION_NAME_LEN+3];
+// Prompt is the station name with some extra control characters.
+char color_prompt[MAX_STATION_NAME_LEN+14];
+
+void set_console_prompt_text(void)
+{
+    if (strlen(current_config.station_name) > 0) {
+        snprintf(color_prompt, sizeof(color_prompt),
+                 LOG_COLOR_I "%s> " LOG_RESET_COLOR,
+                 current_config.station_name);
+
+        snprintf(plain_prompt, sizeof(plain_prompt), "%s> ",
+                 current_config.station_name);
+    }
+    else {
+        snprintf(color_prompt, sizeof(color_prompt),
+                 LOG_COLOR_I "sensor> " LOG_RESET_COLOR);
+
+        snprintf(plain_prompt, sizeof(plain_prompt), "sensor> ");
+    }
+}
 
 /**
  * Initialize nonvolatile storage.
@@ -95,19 +119,16 @@ static void initialize_console(void)
  */
 static void console_task(void *pvParameters)
 {
-
     initialize_console();
+
+    bool use_color_prompt = true;
+    const char *prompt;
 
     /* Register commands */
     esp_console_register_help_command();
     register_system();
     register_configure();
     register_wifi();
-
-    /* Prompt to be printed before each line.
-     * This can be customized, made dynamic, etc.
-     */
-    const char *prompt = LOG_COLOR_I "sensor> " LOG_RESET_COLOR;
 
     printf("\n"
            LOG_COLOR(LOG_COLOR_BLUE)
@@ -128,15 +149,23 @@ static void console_task(void *pvParameters)
         /* Since the terminal doesn't support escape sequences,
          * don't use color codes in the prompt.
          */
-        prompt = "esp32> ";
+        use_color_prompt = false;
 #endif //CONFIG_LOG_COLORS
     }
+
+    set_console_prompt_text();
 
     /* Main loop */
     while(true) {
         /* Get a line using linenoise.
          * The line is returned when ENTER is pressed.
          */
+        if (use_color_prompt) {
+            prompt = color_prompt;
+        }
+        else {
+            prompt = plain_prompt;
+        }
         char *line = linenoise(prompt);
         if (line == NULL) { /* Ignore empty lines */
             continue;
@@ -169,9 +198,6 @@ static void console_task(void *pvParameters)
     }
 }
 
-/**
- * Start the console task.
- */
 void start_console(void)
 {
     xTaskCreate(console_task, "console", 2048, NULL, CONSOLE_TASK_PRIORITY, NULL);
