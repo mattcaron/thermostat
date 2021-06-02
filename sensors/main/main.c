@@ -44,7 +44,10 @@ void app_main(void)
     // read config pre-zeroes the structure passed in, so there's no explicit
     // need to zero current_config on boot.
     if (read_config_from_nvs(&current_config)) {
-        initialize_wifi(&current_config);
+
+        // FIXME - this should be forked off into a background task so it can
+        // run in the background while the console starts in the foreground.
+        start_wifi(&current_config);
     }
     else {
         ESP_LOGE(TAG, "Error reading NVS config - no configuration applied.");

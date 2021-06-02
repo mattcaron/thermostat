@@ -7,8 +7,15 @@
 #define __CMD_WIFI_H_
 
 /**
- * Initialize wifi.
+ * Start wifi.
+ *
+ * @param current_config config to apply.
  */
-void initialize_wifi(config_storage_t *current_config);
+void start_wifi(config_storage_t *current_config);
+
+/**
+ * Stop wifi.
+ */
+void stop_wifi(void);
 
 #endif // __CMD_WIFI_H_

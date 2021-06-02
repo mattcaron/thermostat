@@ -19,6 +19,7 @@
 #include "console.h"
 #include "cmd_system.h"
 #include "cmd_config.h"
+#include "cmd_wifi.h"
 #include "priorities.h"
 
 /**
@@ -101,6 +102,7 @@ static void console_task(void *pvParameters)
     esp_console_register_help_command();
     register_system();
     register_configure();
+    register_wifi();
 
     /* Prompt to be printed before each line.
      * This can be customized, made dynamic, etc.
