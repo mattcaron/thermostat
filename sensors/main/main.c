@@ -12,6 +12,7 @@
 #include "esp_log.h"
 #include "nvs.h"
 #include "nvs_flash.h"
+#include "driver/gpio.h"
 
 #include "console.h"
 #include "cmd_system.h"
@@ -35,10 +36,30 @@ static void initialize_nvs(void)
 }
 
 /**
+ * Initalize our sensor GPIOs
+ */
+void init_sensor_gpios(void)
+{
+    gpio_config_t gpios = {
+        .pin_bit_mask = GPIO_Pin_12|GPIO_Pin_13|GPIO_Pin_14,
+        .mode = GPIO_MODE_DEF_OUTPUT,
+    };
+
+    ESP_ERROR_CHECK(gpio_config(&gpios));
+
+    ESP_ERROR_CHECK(gpio_set_level(GPIO_NUM_12, 0));
+    ESP_ERROR_CHECK(gpio_set_level(GPIO_NUM_13, 0));
+    ESP_ERROR_CHECK(gpio_set_level(GPIO_NUM_14, 0));
+}
+
+/**
  * Main
  */
 void app_main(void)
 {
+    // First thing, init our sensor GPIOs and drive to ground.
+    init_sensor_gpios();
+
     initialize_nvs();
 
     // read config pre-zeroes the structure passed in, so there's no explicit
