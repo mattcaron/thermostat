@@ -21,6 +21,7 @@
 #include "cmd_config.h"
 #include "config_storage.h"
 #include "cmd_wifi.h"
+#include "cmd_temperature.h"
 #include "priorities.h"
 
 // Plain prompt is the station name with a >, a space, and a NUL.
@@ -129,6 +130,7 @@ static void console_task(void *pvParameters)
     register_system();
     register_configure();
     register_wifi();
+    register_temperature();
 
     printf("\n"
            LOG_COLOR(LOG_COLOR_BLUE)
