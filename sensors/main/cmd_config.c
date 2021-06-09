@@ -271,5 +271,5 @@ static void register_config(void)
         .hint = NULL,
         .func = &tasks_config,
     };
-    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }

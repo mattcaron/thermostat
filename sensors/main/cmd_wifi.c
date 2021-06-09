@@ -120,5 +120,5 @@ static void register_wifi_cmd(void)
         .hint = NULL,
         .func = &tasks_wifi,
     };
-    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
