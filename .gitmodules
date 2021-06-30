@@ -3,4 +3,4 @@
 	url = https://github.com/espressif/ESP8266_RTOS_SDK.git
 [submodule "sensors/esp-idf-lib"]
 	path = sensors/esp-idf-lib
-	url = https://github.com/UncleRus/esp-idf-lib.git
+	url = https://github.com/mattcaron/esp-idf-lib
