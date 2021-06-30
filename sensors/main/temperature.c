@@ -21,15 +21,21 @@ bool read_temperature(float *temperature)
     /* TODO: this whole function could stand improvement (mainly because the
      * library could stand improvement):
      *
-     * 1. If it had a family specific read function, we could save a call to
-     *    the bus scan function.
      * 2. If we wrote the configuration register (which we'd have to do every
      *    time because we keep powering it off), we could lower the precision
      *    to 9 bits (0.5°C resolution) and cut the conversion time from 750ms
      *    to 94. So, even with the config write time, it should save power.
+     *     ^^^ - LIES!!!! There is an EEPROM. We can check it on boot and, if
+     *           it's wrong, reconfigure it and save it. Done.
+     * 
+     *           Of course, none of this functionality is actually written
+     *           yet, so I'll need to add it.
      *
      * Correcting the above will likely mean making an 18B20 specific library
      * of my own which uses the esp-idf-onewire library for comms.
+     *     ^^^ - More LIES!!!! I'm just hacking up the ds18x20 driver to add
+     *           what I want.
+     *     
      */
 
 
