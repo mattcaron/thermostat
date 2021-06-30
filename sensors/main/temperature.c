@@ -52,27 +52,15 @@ bool read_temperature(float *temperature)
      */
     gpio_set_level(POWER_GPIO, 1);
 
-    /* Due to an eccentricity in the library, it uses the address to
-     * determine the chip family in order to determine which scratchpad
-     * data to use for the temperature. As a result, you need the actual
-     * address of our specific device. So, even though we only plan to ever
-     * have one device in this design, we can't just use DS18X20_ANY.
-     */
-    ret = ds18x20_scan_devices(SENSOR_GPIO, &address, 1, &sensor_count);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Error scanning bus: %s", esp_err_to_name(ret));
+    // Measure and read
+    ret = ds18b20_measure_and_read(SENSOR_GPIO, DS18X20_ANY, temperature);
+    if (ret == ESP_OK) {
+        // We have good data, set success.
+        success = true;
     }
     else {
-        // Measure and read
-        ret = ds18x20_measure_and_read(SENSOR_GPIO, address, temperature);
-        if (ret == ESP_OK) {
-            // We have good data, set success.
-            success = true;
-        }
-        else {
-            ESP_LOGE(TAG, "Error reading temperature: %s",
-                     esp_err_to_name(ret));
-        }
+        ESP_LOGE(TAG, "Error reading temperature: %s",
+                 esp_err_to_name(ret));
     }
 
     /* We've now gotten the temperature, turn off the power line, turn off
