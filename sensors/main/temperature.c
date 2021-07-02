@@ -16,6 +16,11 @@ static const char *TAG = "temperature";
 #define SENSOR_GPIO GPIO_NUM_12
 #define POWER_GPIO GPIO_NUM_14
 
+// 750ms for now, until I get real DS18B20s which actually save their
+// EEPROM properly.
+#define MEASUREMENT_DELAY_MS 750
+// #define MEASUREMENT_DELAY_MS 94
+
 /**
  * Turn on our sensor.
  */
@@ -78,15 +83,25 @@ bool read_temperature(float *temperature)
 
     sensor_on();
 
-    // Measure and read
-    ret = ds18b20_measure_and_read(SENSOR_GPIO, DS18X20_ANY, temperature);
-    if (ret == ESP_OK) {
-        // We have good data, set success.
-        success = true;
+    // Start measuring. false here means don't wait.
+    ret = ds18x20_measure(SENSOR_GPIO, DS18X20_ANY, false);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Error starting measurement: %s", esp_err_to_name(ret));
     }
     else {
-        ESP_LOGE(TAG, "Error reading temperature: %s",
-                 esp_err_to_name(ret));
+        // wait for measurement to happen
+        vTaskDelay(MEASUREMENT_DELAY_MS / portTICK_PERIOD_MS);
+
+        // Read it back.
+        ret = ds18b20_read_temperature(SENSOR_GPIO, DS18X20_ANY, temperature);
+        if (ret == ESP_OK) {
+            // We have good data, set success.
+            success = true;
+        }
+        else {
+            ESP_LOGE(TAG, "Error reading temperature: %s",
+                     esp_err_to_name(ret));
+        }
     }
 
     sensor_off();
