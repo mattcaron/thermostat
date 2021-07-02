@@ -73,9 +73,6 @@ bool read_temperature(float *temperature)
      *
      */
 
-
-    ds18x20_addr_t address;
-    size_t sensor_count = 0;
     esp_err_t ret;
     bool success = false;
 

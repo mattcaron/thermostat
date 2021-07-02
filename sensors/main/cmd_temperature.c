@@ -13,7 +13,7 @@
 #include "console.h"
 #include "temperature.h"
 
-static const char *TAG = "cmd_temperature";
+// static const char *TAG = "cmd_temperature";
 
 #define TEMPERATURE_HELP_COMMAND "help"
 #define TEMPERATURE_READ_COMMAND "read"
