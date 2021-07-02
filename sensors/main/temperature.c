@@ -27,9 +27,9 @@ static const char *TAG = "temperature";
 static void sensor_on(void)
 {
     /* Set pullup mode on comms pin so the bus works.
-      * The internal pullup violates the datasheet recommendations,
-      * but works, and saves us an external resistor.
-      */
+     * The internal pullup violates the datasheet recommendations,
+     * but works, and saves us an external resistor.
+     */
     gpio_set_pull_mode(SENSOR_GPIO, GPIO_PULLUP_ONLY);
 
     /* Turn on the power line.
@@ -37,9 +37,11 @@ static void sensor_on(void)
      * various 1820 compatible sensors require external capacitors in order
      * to work properly. As a result, I am just powering it from a
      * neighboring GPIO.
+     *
+     * TODO: Those sensors suck. Switch to parasite mode once my real
+     * DS18B20's show up.
      */
     gpio_set_level(POWER_GPIO, 1);
-
 }
 
 /**
@@ -58,26 +60,6 @@ static void sensor_off(void)
 
 bool read_temperature(float *temperature)
 {
-    /* TODO: this whole function could stand improvement (mainly because the
-     * library could stand improvement):
-     *
-     * 2. If we wrote the configuration register (which we'd have to do every
-     *    time because we keep powering it off), we could lower the precision
-     *    to 9 bits (0.5°C resolution) and cut the conversion time from 750ms
-     *    to 94. So, even with the config write time, it should save power.
-     *     ^^^ - LIES!!!! There is an EEPROM. We can check it on boot and, if
-     *           it's wrong, reconfigure it and save it. Done.
-     *
-     *           Of course, none of this functionality is actually written
-     *           yet, so I'll need to add it.
-     *
-     * Correcting the above will likely mean making an 18B20 specific library
-     * of my own which uses the esp-idf-onewire library for comms.
-     *     ^^^ - More LIES!!!! I'm just hacking up the ds18x20 driver to add
-     *           what I want.
-     *
-     */
-
     esp_err_t ret;
     bool success = false;
 
