@@ -18,6 +18,7 @@
 #include "cmd_system.h"
 #include "config_storage.h"
 #include "wifi.h"
+#include "temperature.h"
 
 static const char *TAG = "main";
 
@@ -73,6 +74,9 @@ void app_main(void)
     else {
         ESP_LOGE(TAG, "Error reading NVS config - no configuration applied.");
     }
+
+    // Check and fix our sensor config.
+    check_and_fix_18b20_configuration();
 
     start_console();
 }

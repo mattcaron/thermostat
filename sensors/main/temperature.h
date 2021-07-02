@@ -18,4 +18,12 @@
  */
 bool read_temperature(float *temperature);
 
+/**
+ * Check and (optionally) fix the configuration.
+ *
+ * @return true the configuration was or is now correct.
+ * @return false if there was any sort of error.
+ */
+bool check_and_fix_18b20_configuration(void);
+
 #endif // __TEMPERATURE_H_
