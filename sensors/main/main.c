@@ -37,7 +37,10 @@ static void initialize_nvs(void)
 }
 
 /**
- * Initalize our sensor GPIOs
+ * Initalize our sensor GPIOs.
+ *
+ * For starters, all of them are set to outputs and turned off. We'll turn
+ * the bus on when we need it and power it via parasite mode.
  */
 void init_sensor_gpios(void)
 {

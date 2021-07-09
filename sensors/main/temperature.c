@@ -14,12 +14,10 @@
 static const char *TAG = "temperature";
 
 #define SENSOR_GPIO GPIO_NUM_12
-#define POWER_GPIO GPIO_NUM_14
 
-// 750ms for now, until I get real DS18B20s which actually save their
-// EEPROM properly.
-#define MEASUREMENT_DELAY_MS 750
-// #define MEASUREMENT_DELAY_MS 94
+// From the datasheet, with R0 and R1 both 0, the 9 bit resolution takes
+// 93.75ms to do the conversion.
+#define MEASUREMENT_DELAY_MS 94
 
 /**
  * Turn on our sensor.
@@ -31,17 +29,6 @@ static void sensor_on(void)
      * but works, and saves us an external resistor.
      */
     gpio_set_pull_mode(SENSOR_GPIO, GPIO_PULLUP_ONLY);
-
-    /* Turn on the power line.
-     * Note that I had intended to run this in parasite power mode, except
-     * various 1820 compatible sensors require external capacitors in order
-     * to work properly. As a result, I am just powering it from a
-     * neighboring GPIO.
-     *
-     * TODO: Those sensors suck. Switch to parasite mode once my real
-     * DS18B20's show up.
-     */
-    gpio_set_level(POWER_GPIO, 1);
 }
 
 /**
@@ -49,11 +36,9 @@ static void sensor_on(void)
  */
 static void sensor_off(void)
 {
-    /* We've now gotten the temperature, turn off the power line, turn off
-     * the bus line, and pull the bus line down avoid current leakage across
-     * the pullup.
+    /* We've now gotten the temperature, turn off the bus line, and
+     * pull the bus line down avoid current leakage across the pullup.
      */
-    gpio_set_level(POWER_GPIO, 0);
     gpio_set_level(SENSOR_GPIO, 0);
     gpio_set_pull_mode(SENSOR_GPIO, GPIO_PULLDOWN_ONLY);
 }
@@ -107,7 +92,6 @@ bool check_and_fix_18b20_configuration(void)
                  esp_err_to_name(ret));
     }
     else {
-        ESP_LOGI(TAG, "Config is 0x%X", scratchpad[4]);
         /* The config register is byte index 4, and we want to turn off the
          * high 3 bits and leave the others alone.
          * Note that, strictly speaking, the DS18B20 only cares about bits 5
@@ -116,10 +100,14 @@ bool check_and_fix_18b20_configuration(void)
          * should result in the standard behavior and not bother the actual
          * DS18B20.
          */
-        if ((scratchpad[4] & 0xE0) != 0) {
+        if ((scratchpad[4] & 0xE0) == 0) {
+            ESP_LOGI(TAG, "Temperature sensor config is correct.");
+        }
+        else {
             scratchpad[4] = scratchpad[4] & 0x1F;
 
-            ESP_LOGI(TAG, "Rewriting config.");
+            ESP_LOGI(TAG,
+                     "Temperature sensor config is incorrect - rewriting.");
 
             // We only write bytes 2-4, to the scratchpad.
             ret = ds18x20_write_scratchpad(SENSOR_GPIO,
