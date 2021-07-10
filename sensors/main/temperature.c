@@ -47,11 +47,19 @@ bool read_temperature(float *temperature)
 {
     esp_err_t ret;
     bool success = false;
+    int count;
 
     sensor_on();
 
     // Start measuring. false here means don't wait.
     ret = ds18x20_measure(SENSOR_GPIO, DS18X20_ANY, false);
+    count = 0;
+    // occasionally we'll fail to start the conversion, so retry until
+    // it succeeds or we give up.
+    while (ret != ESP_OK && count < 5) {
+        ret = ds18x20_measure(SENSOR_GPIO, DS18X20_ANY, false);
+        ++count;
+    }
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Error starting measurement: %s", esp_err_to_name(ret));
     }
@@ -61,6 +69,14 @@ bool read_temperature(float *temperature)
 
         // Read it back.
         ret = ds18b20_read_temperature(SENSOR_GPIO, DS18X20_ANY, temperature);
+        count = 0;
+        // occasionally we'll get corrupt data (detectable via bad CRC)
+        // so retry the read until it succeeds or we give up.
+        while (ret != ESP_OK && count < 5) {
+            ret = ds18b20_read_temperature(
+                      SENSOR_GPIO, DS18X20_ANY, temperature);
+            ++count;
+        }
         if (ret == ESP_OK) {
             // We have good data, set success.
             success = true;
