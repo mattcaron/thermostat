@@ -12,6 +12,7 @@
 #include "argtable3/argtable3.h"
 #include "console.h"
 #include "temperature.h"
+#include "config_storage.h"
 
 // static const char *TAG = "cmd_temperature";
 
@@ -45,7 +46,12 @@ static void read_and_print_temperature(void)
 {
     float temperature;
     if (read_temperature(&temperature)) {
-        printf("Temperature is %.3f°C\n", temperature);
+        if (current_config.use_celsius) {
+            printf("Temperature is %.1f°C\n", temperature);
+        }
+        else {
+            printf("Temperature is %.1f°F\n", c_to_f(temperature));
+        }
     }
     else {
         printf("Error reading temperature.\n");

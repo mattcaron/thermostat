@@ -26,4 +26,13 @@ bool read_temperature(float *temperature);
  */
 bool check_and_fix_18b20_configuration(void);
 
+/**
+ * Convert Celsius to Farenheit.
+ *
+ * @param celsius The temperature in Celsius.
+ *
+ * @return The temperature in Farenheit.
+ */
+float c_to_f(float celsius);
+
 #endif // __TEMPERATURE_H_

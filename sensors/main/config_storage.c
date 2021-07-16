@@ -17,6 +17,9 @@
 #define NVS_SSID_NAME "ssid"
 #define NVS_PASS_NAME "pass"
 #define NVS_STATION_NAME "sta"
+#define NVS_BITFIELD "bits"
+
+#define NVS_BITFIELD_USE_CELSIUS 0x00000001
 
 config_storage_t current_config;
 
@@ -51,6 +54,7 @@ bool read_config_from_nvs(config_storage_t *config)
 {
     nvs_handle handle;
     esp_err_t ret;
+    uint32_t bitfield;
 
     // zero our structure.
     memset(config, 0, sizeof(config_storage_t));
@@ -77,6 +81,14 @@ bool read_config_from_nvs(config_storage_t *config)
                         config->pass, sizeof(config->pass)));
         ESP_ERROR_CHECK(read_config_string_from_nvs(handle, NVS_STATION_NAME,
                         config->station_name, sizeof(config->station_name)));
+        ESP_ERROR_CHECK(nvs_get_u32(handle, NVS_BITFIELD, &bitfield));
+
+        if (bitfield & NVS_BITFIELD_USE_CELSIUS) {
+            config->use_celsius = true;
+        }
+        else {
+            config->use_celsius = false;
+        }
     }
 
     nvs_close(handle);
@@ -88,10 +100,18 @@ bool write_config_to_nvs(config_storage_t *config)
 {
     nvs_handle handle;
     esp_err_t ret;
+    uint32_t bitfield = 0;
 
     ret = nvs_open(NVS_CONFIG_NAMESPACE, NVS_READWRITE, &handle);
 
     ESP_ERROR_CHECK(ret);
+
+    if (config->use_celsius) {
+        bitfield |= NVS_BITFIELD_USE_CELSIUS;
+    }
+    else {
+        bitfield &= ~NVS_BITFIELD_USE_CELSIUS;
+    }
 
     // Write out our config items.
     ESP_ERROR_CHECK(nvs_set_str(handle, NVS_SSID_NAME,
@@ -100,6 +120,7 @@ bool write_config_to_nvs(config_storage_t *config)
                                 config->pass));
     ESP_ERROR_CHECK(nvs_set_str(handle, NVS_STATION_NAME,
                                 config->station_name));
+    ESP_ERROR_CHECK(nvs_set_u32(handle, NVS_BITFIELD, bitfield))
 
     nvs_commit(handle);
 

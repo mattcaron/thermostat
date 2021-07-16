@@ -23,6 +23,7 @@ static const char *TAG = "cmd_config";
 #define CONFIG_SET_SSID "ssid"
 #define CONFIG_SET_PASS "pass"
 #define CONFIG_SET_NAME "name"
+#define CONFIG_SET_TEMP_UNIT "unit"
 
 config_storage_t new_config;
 
@@ -57,7 +58,12 @@ static void emit_config_items(config_storage_t *config)
     printf("\tStation Name: \t%s\n", config->station_name);
     printf("\tSSID:    \t%s\n", config->ssid);
     printf("\tPassword:\t%s\n", config->pass);
-
+    if (config->use_celsius) {
+        printf("\tTemp Unit:\tC\n");
+    }
+    else {
+        printf("\tTemp Unit:\tF\n");
+    }
 }
 
 /**
@@ -70,6 +76,7 @@ static void emit_config(void)
 
     if (is_unsaved_changes()) {
         printf("\n");
+        printf("== New config ==\n");
         emit_config_items(&new_config);
     }
 }
@@ -90,7 +97,9 @@ static void emit_set_help(void)
     printf("    " CONFIG_SET_NAME
            " = the name of this station (%d char max).\n",
            MAX_STATION_NAME_LEN);
-    printf("        Note: surround the name with quotes if you use spaces.");
+    printf("        Note: surround the name with quotes if you use spaces.\n");
+    printf("    " CONFIG_SET_TEMP_UNIT
+           " = the temp unit used by this unit (C or F)\n");
     printf("\n");
 }
 
@@ -166,6 +175,24 @@ static int handle_set(int argc, char **argv)
                 strncpy(new_config.station_name, argv[3],
                         sizeof(new_config.station_name));
                 retval = 0;
+            }
+        }
+        else if (strcmp(argv[2], CONFIG_SET_TEMP_UNIT) == 0) {
+            if (strlen(argv[3]) != 1) {
+                printf("Error: temp unit should be 'C' or 'F'");
+            }
+            else {
+                if (argv[3][0] == 'C') {
+                    new_config.use_celsius = true;
+                    retval = 0;
+                }
+                else if (argv[3][0] == 'F') {
+                    new_config.use_celsius = false;
+                    retval = 0;
+                }
+                else {
+                    printf("Error: temp unit should be 'C' or 'F'");
+                }
             }
         }
         else {

@@ -151,3 +151,8 @@ bool check_and_fix_18b20_configuration(void)
 
     return success;
 }
+
+float c_to_f(float celsius)
+{
+    return celsius * 1.8 + 32;
+}

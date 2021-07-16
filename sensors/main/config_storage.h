@@ -18,6 +18,8 @@ typedef struct {
     char ssid[MAX_SSID_LEN+1];              /**< SSID */
     char pass[MAX_PASSPHRASE_LEN+1];        /**< Password for above. */
     char station_name[MAX_STATION_NAME_LEN+1]; /**< The name of this station. */
+    bool use_celsius;                       /**< Whether to use Celsius or
+                                                 Farenheit */
     // TODO: Add MQTT channel(s)
 } config_storage_t;
 
