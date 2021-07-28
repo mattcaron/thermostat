@@ -14,11 +14,13 @@
 #include "nvs_flash.h"
 #include "driver/gpio.h"
 
+#include "esp_system.h"
 #include "console.h"
 #include "cmd_system.h"
 #include "config_storage.h"
 #include "wifi.h"
 #include "temperature.h"
+#include "queues.h"
 
 static const char *TAG = "main";
 
@@ -64,7 +66,19 @@ void app_main(void)
     // First thing, init our sensor GPIOs and drive to ground.
     init_sensor_gpios();
 
+    // And then we create all our queues so they're set up for our tasks to
+    // use once they are started.
+    if (!create_queues()) {
+        ESP_LOGE(TAG, "Error creating queues. We're screwed.");
+        esp_restart();
+    }
+
+    // And get our nonvolatile storage set up.
     initialize_nvs();
+
+    // Init our wifi task. It doesn't do anything until it gets a message, so
+    // it's safe.
+    start_wifi();
 
     // read config pre-zeroes the structure passed in, so there's no explicit
     // need to zero current_config on boot.
@@ -72,7 +86,7 @@ void app_main(void)
 
         // FIXME - this should be forked off into a background task so it can
         // run in the background while the console starts in the foreground.
-        start_wifi(&current_config);
+        wifi_enable();
     }
     else {
         ESP_LOGE(TAG, "Error reading NVS config - no configuration applied.");

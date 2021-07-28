@@ -231,8 +231,7 @@ static bool handle_save()
         memcpy(&new_config, &current_config, sizeof(new_config));
 
         set_console_prompt_text();
-        stop_wifi();
-        start_wifi(&current_config);
+        wifi_restart();
 
         // If we got here, everything succeeded and we are therefore happy.
         retval = 0;
