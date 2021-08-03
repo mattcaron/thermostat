@@ -7,26 +7,6 @@
 #define __TEMPERATURE_H_
 
 /**
- * Read the temperature.
- *
- * @param temperature [out] pointer to variable to receive the
- *                          temperature. Only valid if the function
- *                          returns true.
- *
- * @return true if the temperature read succeeded.
- * @return false if the temperature read succeeded.
- */
-bool read_temperature(float *temperature);
-
-/**
- * Check and (optionally) fix the configuration.
- *
- * @return true the configuration was or is now correct.
- * @return false if there was any sort of error.
- */
-bool check_and_fix_18b20_configuration(void);
-
-/**
  * Convert Celsius to Farenheit.
  *
  * @param celsius The temperature in Celsius.
@@ -34,5 +14,21 @@ bool check_and_fix_18b20_configuration(void);
  * @return The temperature in Farenheit.
  */
 float c_to_f(float celsius);
+
+/**
+ * Retrieve our last sampled temperature.
+ *
+ * This his so the CLI can report it without triggering another read,
+ * because then we'd have to guard the hardware access with a mutex and
+ * that's just unnecessary for a rarely used feature.
+ *
+ * @return the last value of the last sampled temperature.
+ */
+float get_last_temp(void);
+
+/**
+ * Start our temperature polling task.
+ */
+void start_temp_polling(void);
 
 #endif // __TEMPERATURE_H_

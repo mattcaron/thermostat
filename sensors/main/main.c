@@ -77,7 +77,7 @@ void app_main(void)
     initialize_nvs();
 
     // Init our wifi task. It doesn't do anything until it gets a message, so
-    // it's safe.
+    // it's safe to call before we've read our config.
     start_wifi();
 
     // read config pre-zeroes the structure passed in, so there's no explicit
@@ -92,8 +92,7 @@ void app_main(void)
         ESP_LOGE(TAG, "Error reading NVS config - no configuration applied.");
     }
 
-    // Check and fix our sensor config.
-    check_and_fix_18b20_configuration();
+    start_temp_polling();
 
     start_console();
 }

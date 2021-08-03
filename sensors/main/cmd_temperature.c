@@ -44,17 +44,12 @@ static void emit_temperature_help(void)
  */
 static void read_and_print_temperature(void)
 {
-    float temperature;
-    if (read_temperature(&temperature)) {
-        if (current_config.use_celsius) {
-            printf("Temperature is %.1f°C\n", temperature);
-        }
-        else {
-            printf("Temperature is %.1f°F\n", c_to_f(temperature));
-        }
+    float temperature = get_last_temp();
+    if (current_config.use_celsius) {
+        printf("Temperature is %.1f°C\n", temperature);
     }
     else {
-        printf("Error reading temperature.\n");
+        printf("Temperature is %.1f°F\n", c_to_f(temperature));
     }
 }
 

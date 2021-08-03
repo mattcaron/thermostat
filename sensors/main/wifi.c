@@ -226,9 +226,7 @@ void wifi_restart(void)
 
     xQueueSend(wifi_queue, &message, portMAX_DELAY);
 }
-/**
- * Basic WiFi task creation.
- */
+
 void start_wifi(void)
 {
     xTaskCreate(wifi_task, "wifi", 2048, NULL, WIFI_TASK_PRIORITY, NULL);

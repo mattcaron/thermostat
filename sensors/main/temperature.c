@@ -9,7 +9,9 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include "priorities.h"
 #include "temperature.h"
+#include "config_storage.h"
 
 static const char *TAG = "temperature";
 
@@ -18,6 +20,9 @@ static const char *TAG = "temperature";
 // From the datasheet, with R0 and R1 both 0, the 9 bit resolution takes
 // 93.75ms to do the conversion.
 #define MEASUREMENT_DELAY_MS 94
+
+// The last temperature we read.
+float last_temp = 0;
 
 /**
  * Turn on our sensor.
@@ -43,7 +48,17 @@ static void sensor_off(void)
     gpio_set_pull_mode(SENSOR_GPIO, GPIO_PULLDOWN_ONLY);
 }
 
-bool read_temperature(float *temperature)
+/**
+ * Read the temperature.
+ *
+ * @param temperature [out] pointer to variable to receive the
+ *                          temperature. Only valid if the function
+ *                          returns true.
+ *
+ * @return true if the temperature read succeeded.
+ * @return false if the temperature read succeeded.
+ */
+static bool read_temperature(float *temperature)
 {
     esp_err_t ret;
     bool success = false;
@@ -92,7 +107,13 @@ bool read_temperature(float *temperature)
     return success;
 }
 
-bool check_and_fix_18b20_configuration(void)
+/**
+ * Check and (optionally) fix the configuration.
+ *
+ * @return true the configuration was or is now correct.
+ * @return false if there was any sort of error.
+ */
+static bool check_and_fix_18b20_configuration(void)
 {
     // scratchpad holds 8 bytes of data
     uint8_t scratchpad[8] = {};
@@ -155,4 +176,66 @@ bool check_and_fix_18b20_configuration(void)
 float c_to_f(float celsius)
 {
     return celsius * 1.8 + 32;
+}
+
+/**
+ * Temperatue polling task.
+ *
+ * @param pvParameters Parameters for the function (unused)
+ */
+static void temp_task(void *pvParameters)
+{
+    bool successful_read;
+    TickType_t last_wake_time = xTaskGetTickCount();
+    TickType_t interval = 0;
+
+    float temp_temp;
+
+    // Check and fix our sensor config.
+    check_and_fix_18b20_configuration();
+
+    while (true) {
+        successful_read = false;
+
+        while (!successful_read) {
+            successful_read = read_temperature(&temp_temp);
+            if (successful_read && temp_temp == 85) {
+                /* 85 is the power on reset value and sometimes our call to
+                 * kick off a temperature conversion silently fails, resulting
+                 * in no conversion happening. Since this is for residential
+                 * HVAC, if we're ever in that temperature range, no amount of * AC is ever going to save us. So, it's fair to treat this as * out of range and sample again, even though doing so might
+                 * put us into an infinite loop if it were ever to get that
+                 * warm. I'm willing to take that risk.
+                */
+                successful_read = false;
+            }
+        }
+
+        // good temp, update
+        last_temp = temp_temp;
+
+        if (current_config.use_celsius) {
+            ESP_LOGI(TAG, "Read temp: %.1f°C", last_temp);
+        }
+        else {
+            ESP_LOGI(TAG, "Read temp: %.1f°F\n", c_to_f(last_temp));
+        }
+
+        // we recalculate this every time through the loop in case it changes.
+        interval = (current_config.poll_time_sec * 1000) /
+                   portTICK_PERIOD_MS;
+
+        // TODO - replace this with a deep sleep.
+        vTaskDelayUntil(&last_wake_time, interval);
+    }
+}
+
+float get_last_temp(void)
+{
+    return last_temp;
+}
+
+void start_temp_polling(void)
+{
+    xTaskCreate(temp_task, "temp", 2048, NULL, TEMP_TASK_PRIORITY, NULL);
 }
