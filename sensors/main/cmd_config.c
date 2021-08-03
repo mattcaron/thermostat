@@ -3,6 +3,7 @@
  * Various configuration console commands.
  */
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -24,6 +25,7 @@ static const char *TAG = "cmd_config";
 #define CONFIG_SET_PASS "pass"
 #define CONFIG_SET_NAME "name"
 #define CONFIG_SET_TEMP_UNIT "unit"
+#define CONFIG_SET_POLL_INTERVAL "polling"
 
 config_storage_t new_config;
 
@@ -64,6 +66,7 @@ static void emit_config_items(config_storage_t *config)
     else {
         printf("\tTemp Unit:\tF\n");
     }
+    printf("\tPolling:\t%us\n", config->poll_time_sec);
 }
 
 /**
@@ -100,6 +103,12 @@ static void emit_set_help(void)
     printf("        Note: surround the name with quotes if you use spaces.\n");
     printf("    " CONFIG_SET_TEMP_UNIT
            " = the temp unit used by this unit (C or F)\n");
+    printf("    " CONFIG_SET_POLL_INTERVAL
+           " = the time between temperature checks in seconds\n"
+           "            (max %u).\n", UINT16_MAX);
+    printf("        Note: this has battery implications. Lower values will\n"
+           "        consume more battery, higher values will be less responsive.\n");
+
     printf("\n");
 }
 
@@ -137,6 +146,7 @@ static int handle_set(int argc, char **argv)
 {
     // Assume failure.
     int retval = 1;
+    int temp;
 
     // at this point, argument should be like:
     //     config set ssid frobz
@@ -193,6 +203,19 @@ static int handle_set(int argc, char **argv)
                 else {
                     printf("Error: temp unit should be 'C' or 'F'");
                 }
+            }
+        }
+        else if (strcmp(argv[2], CONFIG_SET_POLL_INTERVAL) == 0) {
+            temp = atoi(argv[3]);
+            if (temp > UINT16_MAX) {
+                printf("Error: polling interval max is %u seconds\n", UINT16_MAX);
+            }
+            else if (temp < 1) {
+                printf("Error: polling interval minimum is 1 second\n");
+            }
+            else {
+                new_config.poll_time_sec = (uint16_t)temp;
+                retval = 0;
             }
         }
         else {

@@ -18,8 +18,13 @@
 #define NVS_PASS_NAME "pass"
 #define NVS_STATION_NAME "sta"
 #define NVS_BITFIELD "bits"
+#define NVS_POLL_TIME_SEC "poll"
 
 #define NVS_BITFIELD_USE_CELSIUS 0x00000001
+
+// defaults
+#define NVS_BITFIELD_DEFAULT NVS_BITFIELD_USE_CELSIUS
+#define POLL_TIME_DEFAULT_SEC 600
 
 config_storage_t current_config;
 
@@ -81,14 +86,28 @@ bool read_config_from_nvs(config_storage_t *config)
                         config->pass, sizeof(config->pass)));
         ESP_ERROR_CHECK(read_config_string_from_nvs(handle, NVS_STATION_NAME,
                         config->station_name, sizeof(config->station_name)));
-        ESP_ERROR_CHECK(nvs_get_u32(handle, NVS_BITFIELD, &bitfield));
 
+        ret = nvs_get_u32(handle, NVS_BITFIELD, &bitfield);
+        if (ret == ESP_ERR_NVS_NOT_FOUND) {
+            bitfield = NVS_BITFIELD_DEFAULT;
+            ret = ESP_OK;
+        }
+        ESP_ERROR_CHECK(ret);
+
+        // Decode all bitfield items
         if (bitfield & NVS_BITFIELD_USE_CELSIUS) {
             config->use_celsius = true;
         }
         else {
             config->use_celsius = false;
         }
+
+        ret = nvs_get_u16(handle, NVS_POLL_TIME_SEC, &config->poll_time_sec);
+        if (ret == ESP_ERR_NVS_NOT_FOUND) {
+            config->poll_time_sec = POLL_TIME_DEFAULT_SEC;
+            ret = ESP_OK;
+        }
+        ESP_ERROR_CHECK(ret);
     }
 
     nvs_close(handle);
@@ -121,6 +140,8 @@ bool write_config_to_nvs(config_storage_t *config)
     ESP_ERROR_CHECK(nvs_set_str(handle, NVS_STATION_NAME,
                                 config->station_name));
     ESP_ERROR_CHECK(nvs_set_u32(handle, NVS_BITFIELD, bitfield))
+    ESP_ERROR_CHECK(nvs_set_u16(handle, NVS_POLL_TIME_SEC,
+                                config->poll_time_sec))
 
     nvs_commit(handle);
 

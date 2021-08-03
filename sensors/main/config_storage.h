@@ -20,6 +20,7 @@ typedef struct {
     char station_name[MAX_STATION_NAME_LEN+1]; /**< The name of this station. */
     bool use_celsius;                       /**< Whether to use Celsius or
                                                  Farenheit */
+    uint16_t poll_time_sec;                 /**< Poll time in seconds. */
     // TODO: Add MQTT channel(s)
 } config_storage_t;
 
