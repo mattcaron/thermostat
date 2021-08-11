@@ -221,9 +221,12 @@ static void temp_task(void *pvParameters)
             ESP_LOGI(TAG, "Read temp: %.1f°F\n", c_to_f(last_temp));
         }
 
-        // we recalculate this every time through the loop in case it changes.
+        // we recalculate this every time through the loop in case the config
+        // gets changed.
         interval = (current_config.poll_time_sec * 1000) /
                    portTICK_PERIOD_MS;
+
+        // TODO - add MQTT message send.
 
         // TODO - replace this with a deep sleep.
         vTaskDelayUntil(&last_wake_time, interval);
