@@ -8,7 +8,8 @@
 
 enum wifi_messages {
     WIFI_START,
-    WIFI_STOP
+    WIFI_STOP,
+    WIFI_SEND_MQTT
 };
 
 /**
@@ -34,5 +35,10 @@ void wifi_disable(void);
  * @note Only call once current_config is valid.
  */
 void wifi_restart(void);
+
+/**
+ * Send last temperature reading over MQTT.
+ */
+void wifi_send_mqtt_temperature(void);
 
 #endif // __WIFI_H_

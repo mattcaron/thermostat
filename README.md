@@ -40,7 +40,7 @@ which you then consume in NodeRED (also below) and make it do what you want.
   1. Config: Done
   1. OneWire to DS18B20: Done
   1. WiFi refactor: Done
-  1. MQTT: Not started
+  1. MQTT: In progress
   1. Power saving deep sleep: Not started
 1. Wiring diagram: Not started
 1. Case design: Not started

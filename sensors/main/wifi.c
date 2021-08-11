@@ -2,9 +2,15 @@
  * @file
  * WiFi code.
  *
+ * Okay, that's a lie. It does MQTT too....
+ *
  * Derived from ESP8266_RTOS_SDK example
  * examples/wifi/getting_started/station/main/station_example_main.c, which is
  * licensed as Public Domain.
+ *
+ * Also derived from ESP8266_RTOS_SDK example
+ * examples/protocols/mqtt/ssl/main/app_main.c, which is also licensed as
+ * Public Domain.
  */
 
 #include <string.h>
@@ -19,6 +25,7 @@
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "queues.h"
+#include "mqtt_client.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
@@ -26,6 +33,7 @@
 #include "priorities.h"
 #include "wifi.h"
 #include "config_storage.h"
+#include "temperature.h"
 
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t s_wifi_event_group;
@@ -39,8 +47,96 @@ static const char *TAG = "WiFi";
 
 static int s_retry_num = 0;
 
-static void event_handler(void *arg, esp_event_base_t event_base,
-                          int32_t event_id, void *event_data)
+esp_mqtt_client_handle_t mqtt_client = NULL;
+
+static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
+                               int32_t event_id, void *event_data)
+{
+    esp_mqtt_event_handle_t event = event_data;
+
+    esp_mqtt_client_handle_t client = event->client;
+
+    int msg_id;
+
+    switch (event->event_id) {
+        case MQTT_EVENT_CONNECTED:
+            ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
+            msg_id = esp_mqtt_client_subscribe(client,
+                                               current_config.mqtt_topic,
+                                               1);
+            ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
+            break;
+
+        case MQTT_EVENT_DISCONNECTED:
+            ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
+            break;
+
+        case MQTT_EVENT_SUBSCRIBED:
+            ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
+            break;
+
+        case MQTT_EVENT_UNSUBSCRIBED:
+            ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
+            break;
+
+        case MQTT_EVENT_PUBLISHED:
+            ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
+            break;
+
+        case MQTT_EVENT_DATA:
+            ESP_LOGI(TAG, "MQTT_EVENT_DATA");
+            printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
+            printf("DATA=%.*s\r\n", event->data_len, event->data);
+            break;
+
+        case MQTT_EVENT_ERROR:
+            ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
+            if (event->error_handle->error_type == MQTT_ERROR_TYPE_ESP_TLS) {
+                ESP_LOGI(TAG, "Last error code reported from esp-tls: 0x%x",
+                         event->error_handle->esp_tls_last_esp_err);
+                ESP_LOGI(TAG, "Last tls stack error number: 0x%x",
+                         event->error_handle->esp_tls_stack_err);
+            }
+            else if (event->error_handle->error_type ==
+                     MQTT_ERROR_TYPE_CONNECTION_REFUSED) {
+                ESP_LOGI(TAG, "Connection refused error: 0x%x",
+                         event->error_handle->connect_return_code);
+            }
+            else {
+                ESP_LOGW(TAG, "Unknown error type: 0x%x", event->error_handle->error_type);
+            }
+            break;
+
+        default:
+            ESP_LOGI(TAG, "Other event id:%d", event->event_id);
+            break;
+    }
+}
+
+/**
+ * Connect to our MQTT broker.
+ *
+ * @note Make sure we're connected to WiFi with an IP before calling this,
+ * else it will fail.
+ */
+static void mqtt_start(void)
+{
+    const esp_mqtt_client_config_t mqtt_cfg = {
+        .uri = current_config.mqtt_uri,
+// TODO - figure out SSL connections
+//        .cert_pem = (const char *)mqtt_eclipse_org_pem_start,
+    };
+
+    mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
+    esp_mqtt_client_register_event(mqtt_client,
+                                   ESP_EVENT_ANY_ID,
+                                   mqtt_event_handler,
+                                   mqtt_client);
+    esp_mqtt_client_start(mqtt_client);
+}
+
+static void wifi_event_handler(void *arg, esp_event_base_t event_base,
+                               int32_t event_id, void *event_data)
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
@@ -85,31 +181,34 @@ static void wifi_init(void)
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID,
-                    &event_handler, NULL));
+                    &wifi_event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP,
-                    &event_handler, NULL));
+                    &wifi_event_handler, NULL));
 
     ESP_LOGI(TAG, "WiFi init finished.");
 }
 
+#if 0
 /**
  * De-init (free) all the WiFi stuff.
  *
  * @note This is basically the reverse of the above and is only included for
- *       completeness - it is unlikely to ever be called.
+ *       completeness - it is never called and has been disabled to suppress a
+ *       compiler warning.
  * @note Make sure to call disconnect_wifi() first.
  */
 static void wifi_deinit(void)
 {
     ESP_ERROR_CHECK(esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP,
-                    &event_handler));
+                    &wifi_event_handler));
     ESP_ERROR_CHECK(esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID,
-                    &event_handler));
+                    &wifi_event_handler));
     ESP_ERROR_CHECK(esp_wifi_deinit());
     ESP_ERROR_CHECK(esp_event_loop_delete_default());
     ESP_ERROR_CHECK(esp_netif_deinit());
     vEventGroupDelete(s_wifi_event_group);
 }
+#endif
 
 /**
  * Configure and connect to a WiFi AP.
@@ -137,7 +236,7 @@ static void connect_wifi(void)
     ESP_LOGI(TAG, "WiFi config finished.");
 
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT)
-     * or connection failed for the maximum number of re-tries (WIFI_FAIL_BIT). * The bits are set by event_handler() (see above). */
+     * or connection failed for the maximum number of re-tries (WIFI_FAIL_BIT). * The bits are set by wifi_event_handler() (see above). */
     EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
                                            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
                                            pdFALSE,
@@ -146,10 +245,13 @@ static void connect_wifi(void)
 
     /* xEventGroupWaitBits() returns the bits before the call returned, hence
      * we can test which event actually happened. */
-    if (bits &WIFI_CONNECTED_BIT) {
+    if (bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(TAG, "connected to SSID: %s", wifi_config.sta.ssid);
+
+        // We are now connected to WiFi, so do our MQTT connection stuff
+        mqtt_start();
     }
-    else if (bits &WIFI_FAIL_BIT) {
+    else if (bits & WIFI_FAIL_BIT) {
         ESP_LOGI(TAG, "Failed to connect to SSID: %s", wifi_config.sta.ssid);
     }
     else {
@@ -177,6 +279,10 @@ static void disconnect_wifi(void)
 static void wifi_task(void *pvParameters)
 {
     uint8_t message;
+    /* temporary temperature buffer. The range is -55 to 125C (-67 to 257F),
+     * which is 3 characters. We also have a decimal point and another place, for a total of 5 characters, and then a NUL, for 6, total. */
+    char buffer[6];
+    int mqtt_msg_id;
 
     // basic wifi init (without configuration)
     wifi_init();
@@ -189,6 +295,18 @@ static void wifi_task(void *pvParameters)
                     break;
                 case WIFI_STOP:
                     disconnect_wifi();
+                    break;
+                case WIFI_SEND_MQTT:
+                    memset(buffer, 0, sizeof(buffer));
+                    sprintf(buffer, "%.1f", get_last_temp());
+                    mqtt_msg_id = esp_mqtt_client_publish(mqtt_client,
+                                                          current_config.mqtt_topic,
+                                                          buffer,
+                                                          strlen(buffer),
+                                                          1,
+                                                          false);
+                    ESP_LOGI(TAG, "mqtt publish successful, msg_id=%d",
+                             mqtt_msg_id);
                     break;
                 default:
                     ESP_LOGE(TAG, "Unknown command: %d", message);
@@ -223,6 +341,16 @@ void wifi_restart(void)
     xQueueSend(wifi_queue, &message, portMAX_DELAY);
 
     message = WIFI_START;
+
+    xQueueSend(wifi_queue, &message, portMAX_DELAY);
+}
+
+/**
+ * Send last temperature reading over MQTT.
+ */
+void wifi_send_mqtt_temperature(void)
+{
+    uint8_t message = WIFI_SEND_MQTT;
 
     xQueueSend(wifi_queue, &message, portMAX_DELAY);
 }

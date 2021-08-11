@@ -26,6 +26,9 @@ static const char *TAG = "cmd_config";
 #define CONFIG_SET_NAME "name"
 #define CONFIG_SET_TEMP_UNIT "unit"
 #define CONFIG_SET_POLL_INTERVAL "polling"
+#define CONFIG_SET_MQTT_URI "uri"
+#define CONFIG_SET_MQTT_TOPIC "topic"
+
 
 config_storage_t new_config;
 
@@ -67,6 +70,8 @@ static void emit_config_items(config_storage_t *config)
         printf("\tTemp Unit:\tF\n");
     }
     printf("\tPolling:\t%us\n", config->poll_time_sec);
+    printf("\tMQTT URI:\t%s\n", config->mqtt_uri);
+    printf("\tMQTT topic:\t%s\n", config->mqtt_topic);
 }
 
 /**
@@ -108,6 +113,10 @@ static void emit_set_help(void)
            "            (max %u).\n", UINT16_MAX);
     printf("        Note: this has battery implications. Lower values will\n"
            "        consume more battery, higher values will be less responsive.\n");
+    printf("    " CONFIG_SET_MQTT_URI " = MQTT URI (%d char max).\n",
+           MAX_MQTT_URI_LEN);
+    printf("    " CONFIG_SET_MQTT_TOPIC " = MQTT topic (%d char max).\n",
+           MAX_MQTT_TOPIC_LEN);
 
     printf("\n");
 }
@@ -215,6 +224,28 @@ static int handle_set(int argc, char **argv)
             }
             else {
                 new_config.poll_time_sec = (uint16_t)temp;
+                retval = 0;
+            }
+        }
+        else if (strcmp(argv[2], CONFIG_SET_MQTT_URI) == 0) {
+            if (strlen(argv[3]) > MAX_MQTT_URI_LEN) {
+                printf("Error: uri too long, maximum is %d characters.\n",
+                       MAX_MQTT_URI_LEN);
+            }
+            else {
+                strncpy(new_config.mqtt_uri, argv[3],
+                        sizeof(new_config.mqtt_uri));
+                retval = 0;
+            }
+        }
+        else if (strcmp(argv[2], CONFIG_SET_MQTT_TOPIC) == 0) {
+            if (strlen(argv[3]) > MAX_MQTT_TOPIC_LEN) {
+                printf("Error: topic too long, maximum is %d characters.\n",
+                       MAX_MQTT_TOPIC_LEN);
+            }
+            else {
+                strncpy(new_config.mqtt_topic, argv[3],
+                        sizeof(new_config.mqtt_topic));
                 retval = 0;
             }
         }

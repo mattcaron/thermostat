@@ -12,6 +12,7 @@
 #include "priorities.h"
 #include "temperature.h"
 #include "config_storage.h"
+#include "wifi.h"
 
 static const char *TAG = "temperature";
 
@@ -221,14 +222,18 @@ static void temp_task(void *pvParameters)
             ESP_LOGI(TAG, "Read temp: %.1f°F\n", c_to_f(last_temp));
         }
 
+        // We've read our temperature, wake up our WiFi task to send it.
+        wifi_send_mqtt_temperature();
+
         // we recalculate this every time through the loop in case the config
         // gets changed.
         interval = (current_config.poll_time_sec * 1000) /
                    portTICK_PERIOD_MS;
 
-        // TODO - add MQTT message send.
-
         // TODO - replace this with a deep sleep.
+        // NOTE: we don't want to go to sleep until the MQTT message is
+        // actually sent, so we'll have to check for that before we go to
+        // sleep.
         vTaskDelayUntil(&last_wake_time, interval);
     }
 }

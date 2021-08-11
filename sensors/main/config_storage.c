@@ -19,6 +19,8 @@
 #define NVS_STATION_NAME "sta"
 #define NVS_BITFIELD "bits"
 #define NVS_POLL_TIME_SEC "poll"
+#define NVS_MQTT_URI "uri"
+#define NVS_MQTT_TOPIC "topic"
 
 #define NVS_BITFIELD_USE_CELSIUS 0x00000001
 
@@ -108,6 +110,11 @@ bool read_config_from_nvs(config_storage_t *config)
             ret = ESP_OK;
         }
         ESP_ERROR_CHECK(ret);
+
+        ESP_ERROR_CHECK(read_config_string_from_nvs(handle, NVS_MQTT_URI,
+                        config->mqtt_uri, sizeof(config->mqtt_uri)));
+        ESP_ERROR_CHECK(read_config_string_from_nvs(handle, NVS_MQTT_TOPIC,
+                        config->mqtt_topic, sizeof(config->mqtt_topic)));
     }
 
     nvs_close(handle);
@@ -141,7 +148,12 @@ bool write_config_to_nvs(config_storage_t *config)
                                 config->station_name));
     ESP_ERROR_CHECK(nvs_set_u32(handle, NVS_BITFIELD, bitfield))
     ESP_ERROR_CHECK(nvs_set_u16(handle, NVS_POLL_TIME_SEC,
-                                config->poll_time_sec))
+                                config->poll_time_sec));
+    ESP_ERROR_CHECK(nvs_set_str(handle, NVS_MQTT_URI,
+                                config->mqtt_uri));
+    ESP_ERROR_CHECK(nvs_set_str(handle, NVS_MQTT_TOPIC,
+                                config->mqtt_topic));
+
 
     nvs_commit(handle);
 
