@@ -3,8 +3,8 @@
  * Header for wifi.c.
  */
 
-#ifndef __CMD_WIFI_H_
-#define __CMD_WIFI_H_
+#ifndef __WIFI_H_
+#define __WIFI_H_
 
 enum wifi_messages {
     WIFI_START,
@@ -35,4 +35,4 @@ void wifi_disable(void);
  */
 void wifi_restart(void);
 
-#endif // __CMD_WIFI_H_
+#endif // __WIFI_H_
