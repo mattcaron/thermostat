@@ -1,2 +1,2 @@
 #!/bin/sh
-make -j8 && make flash && make monitor
+make -j8 flash && make monitor
