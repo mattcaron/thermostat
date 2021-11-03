@@ -25,6 +25,9 @@ static const char *TAG = "temperature";
 // The last temperature we read.
 float last_temp = 0;
 
+// The last temperature is valid.
+bool last_temp_is_valid = false;
+
 /**
  * Turn on our sensor.
  */
@@ -187,6 +190,7 @@ float c_to_f(float celsius)
 static void temp_task(void *pvParameters)
 {
     bool successful_read;
+    int retries;
     TickType_t last_wake_time = xTaskGetTickCount();
     TickType_t interval = 0;
 
@@ -197,8 +201,9 @@ static void temp_task(void *pvParameters)
 
     while (true) {
         successful_read = false;
+        retries = 5; // prevent infinite tight loop
 
-        while (!successful_read) {
+        while (!successful_read && retries > 0 ) {
             successful_read = read_temperature(&temp_temp);
             if (successful_read && temp_temp == 85) {
                 /* 85 is the power on reset value and sometimes our call to
@@ -210,20 +215,28 @@ static void temp_task(void *pvParameters)
                 */
                 successful_read = false;
             }
+            --retries;
         }
 
-        // good temp, update
-        last_temp = temp_temp;
+        if (successful_read) {
+            // good temp, update
+            last_temp = temp_temp;
+            last_temp_is_valid = true;
 
-        if (current_config.use_celsius) {
-            ESP_LOGI(TAG, "Read temp: %.1f°C", last_temp);
+            if (current_config.use_celsius) {
+                ESP_LOGI(TAG, "Read temp: %.1f°C", last_temp);
+            }
+            else {
+                ESP_LOGI(TAG, "Read temp: %.1f°F", c_to_f(last_temp));
+            }
+
+            // We've read our temperature, wake up our WiFi task to send it.
+            wifi_send_mqtt_temperature();
         }
         else {
-            ESP_LOGI(TAG, "Read temp: %.1f°F\n", c_to_f(last_temp));
-        }
-
-        // We've read our temperature, wake up our WiFi task to send it.
-        wifi_send_mqtt_temperature();
+            last_temp_is_valid = false;
+            ESP_LOGI(TAG, "Temperature read invalid - not doing anything.");
+        }            
 
         // we recalculate this every time through the loop in case the config
         // gets changed.
