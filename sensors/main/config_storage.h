@@ -58,4 +58,17 @@ bool read_config_from_nvs(config_storage_t *config);
  */
 bool write_config_to_nvs(config_storage_t *config);
 
+/**
+ * Basic configuration check.
+ *
+ * This is a basic cursory check - it will not detect, for example, a malformed
+ * URL, but it will detect an empty string.
+ *
+ * @param config [in] configuration to check.
+ *
+ * @return true if config is valid.
+ * @return false if config is invalid.
+ */
+bool is_config_valid(config_storage_t *config);
+
 #endif // __CONFIG_STORAGE_H_

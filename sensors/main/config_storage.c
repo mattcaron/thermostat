@@ -161,3 +161,43 @@ bool write_config_to_nvs(config_storage_t *config)
 
     return true;
 }
+
+bool is_config_valid(config_storage_t *config)
+{
+    // this is somewhat optimized for efficiency by using multiple returns, in
+    // violation of best practices.
+
+    if (strlen(config->ssid) == 0) {
+        return false;
+    }
+
+    if (strlen(config->pass) == 0) {
+        return false;
+    }
+
+    if (strlen(config->pass) == 0) {
+        return false;
+    }
+
+    if (strlen(config->station_name) == 0) {
+        return false;
+    }
+
+    // use_celsius only has 2 states, both valid
+
+    // The minimum is 1 second. The maximum is UINT16_MAX, which this can never
+    // be more than, so we don't need to test for.
+    if (config->poll_time_sec < 1) {
+        return false;
+    }
+
+    if (strlen(config->mqtt_uri) == 0) {
+        return false;
+    }
+
+    if (strlen(config->mqtt_topic) == 0) {
+        return false;
+    }
+
+    return true;
+}
