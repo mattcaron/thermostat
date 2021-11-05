@@ -35,6 +35,12 @@
 #include "config_storage.h"
 #include "temperature.h"
 
+struct {
+    unsigned int wifi_connected : 1;
+    unsigned int mqtt_connected : 1;
+    unsigned int mqtt_subscribed : 1;
+} status;
+
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t s_wifi_event_group;
 
@@ -59,57 +65,65 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
     int msg_id;
 
     switch (event->event_id) {
-        case MQTT_EVENT_CONNECTED:
-            ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
-            msg_id = esp_mqtt_client_subscribe(client,
-                                               current_config.mqtt_topic,
-                                               1);
-            ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
-            break;
+    case MQTT_EVENT_CONNECTED:
+        ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
+        status.mqtt_connected = true;
+        msg_id = esp_mqtt_client_subscribe(client,
+                                           current_config.mqtt_topic,
+                                           1);
+        ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
+        break;
 
-        case MQTT_EVENT_DISCONNECTED:
-            ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
-            break;
+    case MQTT_EVENT_DISCONNECTED:
+        ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
+        status.mqtt_connected = false;
+        break;
 
-        case MQTT_EVENT_SUBSCRIBED:
-            ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
-            break;
+    case MQTT_EVENT_SUBSCRIBED:
+        ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
+        status.mqtt_subscribed = true;
+        break;
 
-        case MQTT_EVENT_UNSUBSCRIBED:
-            ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
-            break;
+    case MQTT_EVENT_UNSUBSCRIBED:
+        ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
+        status.mqtt_subscribed = false;
+        break;
 
-        case MQTT_EVENT_PUBLISHED:
-            ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
-            break;
+    case MQTT_EVENT_PUBLISHED:
+        ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
+        break;
 
-        case MQTT_EVENT_DATA:
-            ESP_LOGI(TAG, "MQTT_EVENT_DATA");
-            printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
-            printf("DATA=%.*s\r\n", event->data_len, event->data);
-            break;
+    case MQTT_EVENT_DATA:
+        ESP_LOGI(TAG, "MQTT_EVENT_DATA");
+        printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
+        printf("DATA=%.*s\r\n", event->data_len, event->data);
+        break;
 
-        case MQTT_EVENT_ERROR:
-            ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
-            if (event->error_handle->error_type == MQTT_ERROR_TYPE_ESP_TLS) {
-                ESP_LOGI(TAG, "Last error code reported from esp-tls: 0x%x",
-                         event->error_handle->esp_tls_last_esp_err);
-                ESP_LOGI(TAG, "Last tls stack error number: 0x%x",
-                         event->error_handle->esp_tls_stack_err);
-            }
-            else if (event->error_handle->error_type ==
-                     MQTT_ERROR_TYPE_CONNECTION_REFUSED) {
-                ESP_LOGI(TAG, "Connection refused error: 0x%x",
-                         event->error_handle->connect_return_code);
-            }
-            else {
-                ESP_LOGW(TAG, "Unknown error type: 0x%x", event->error_handle->error_type);
-            }
-            break;
+    case MQTT_EVENT_BEFORE_CONNECT:
+        ESP_LOGI(TAG, "MQTT_EVENT_BEFORE_CONNECT");
+        break;
 
-        default:
-            ESP_LOGI(TAG, "Other event id:%d", event->event_id);
-            break;
+    case MQTT_EVENT_ERROR:
+        ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
+        if (event->error_handle->error_type == MQTT_ERROR_TYPE_ESP_TLS) {
+            ESP_LOGI(TAG, "Last error code reported from esp-tls: 0x%x",
+                     event->error_handle->esp_tls_last_esp_err);
+            ESP_LOGI(TAG, "Last tls stack error number: 0x%x",
+                     event->error_handle->esp_tls_stack_err);
+        }
+        else if (event->error_handle->error_type ==
+                 MQTT_ERROR_TYPE_CONNECTION_REFUSED) {
+            ESP_LOGI(TAG, "Connection refused error: 0x%x",
+                     event->error_handle->connect_return_code);
+        }
+        else {
+            ESP_LOGW(TAG, "Unknown error type: 0x%x", event->error_handle->error_type);
+        }
+        break;
+
+    default:
+        ESP_LOGI(TAG, "Other event id:%d", event->event_id);
+        break;
     }
 }
 
@@ -128,11 +142,12 @@ static void mqtt_start(void)
     };
 
     mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
-    esp_mqtt_client_register_event(mqtt_client,
-                                   ESP_EVENT_ANY_ID,
-                                   mqtt_event_handler,
-                                   mqtt_client);
-    esp_mqtt_client_start(mqtt_client);
+    ESP_ERROR_CHECK(esp_mqtt_client_register_event(
+                        mqtt_client,
+                        ESP_EVENT_ANY_ID,
+                        mqtt_event_handler,
+                        mqtt_client));
+    ESP_ERROR_CHECK(esp_mqtt_client_start(mqtt_client));
 }
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
@@ -247,12 +262,14 @@ static void connect_wifi(void)
      * we can test which event actually happened. */
     if (bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(TAG, "connected to SSID: %s", wifi_config.sta.ssid);
+        status.wifi_connected = true;
 
         // We are now connected to WiFi, so do our MQTT connection stuff
         mqtt_start();
     }
     else if (bits & WIFI_FAIL_BIT) {
         ESP_LOGI(TAG, "Failed to connect to SSID: %s", wifi_config.sta.ssid);
+        status.wifi_connected = false;
     }
     else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
@@ -264,6 +281,7 @@ static void connect_wifi(void)
  */
 static void disconnect_wifi(void)
 {
+    ESP_ERROR_CHECK(esp_mqtt_client_stop(mqtt_client));
     ESP_ERROR_CHECK(esp_wifi_disconnect());
     ESP_ERROR_CHECK(esp_wifi_stop());
 }
@@ -290,27 +308,45 @@ static void wifi_task(void *pvParameters)
     while(true) {
         if (xQueueReceive(wifi_queue, &message, portMAX_DELAY) == pdTRUE) {
             switch(message) {
-                case WIFI_START:
+            case WIFI_START:
+                // TODO: Add some blinkenlights feedback here?
+                if (is_config_valid(&current_config)) {
+                    ESP_LOGI(TAG, "wifi config looks valid, connecting");
                     connect_wifi();
-                    break;
-                case WIFI_STOP:
-                    disconnect_wifi();
-                    break;
-                case WIFI_SEND_MQTT:
+                }
+                else {
+                    ESP_LOGI(TAG, "invalid config, not connecting to wifi");
+                }
+                break;
+            case WIFI_STOP:
+                disconnect_wifi();
+                break;
+            case WIFI_SEND_MQTT:
+                if (status.mqtt_subscribed) {
                     memset(buffer, 0, sizeof(buffer));
                     sprintf(buffer, "%.1f", get_last_temp());
-                    mqtt_msg_id = esp_mqtt_client_publish(mqtt_client,
-                                                          current_config.mqtt_topic,
-                                                          buffer,
-                                                          strlen(buffer),
-                                                          1,
-                                                          false);
-                    ESP_LOGI(TAG, "mqtt publish successful, msg_id=%d",
-                             mqtt_msg_id);
-                    break;
-                default:
-                    ESP_LOGE(TAG, "Unknown command: %d", message);
-                    break;
+                    mqtt_msg_id = esp_mqtt_client_publish(
+                                      mqtt_client,
+                                      current_config.mqtt_topic,
+                                      buffer,
+                                      strlen(buffer),
+                                      1,
+                                      false);
+                    if (mqtt_msg_id >= 0) {
+                        ESP_LOGI(TAG, "mqtt publish successful, msg_id=%d",
+                                 mqtt_msg_id);
+                    } else {
+                        ESP_LOGE(TAG, "mqtt publish unsuccessful");
+                    }
+                }
+                else {
+                    ESP_LOGI(TAG,
+                    "MQTT not subscribed, not publishing message.");
+                }
+                break;
+            default:
+                ESP_LOGE(TAG, "Unknown command: %d", message);
+                break;
             }
         }
         // else we didn't get an item from the queue, just go back and wait.
