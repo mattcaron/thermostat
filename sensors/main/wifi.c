@@ -281,7 +281,11 @@ static void connect_wifi(void)
  */
 static void disconnect_wifi(void)
 {
+    ESP_ERROR_CHECK(esp_mqtt_client_unsubscribe(mqtt_client,
+                                                current_config.mqtt_topic));
+    ESP_ERROR_CHECK(esp_mqtt_client_disconnect(mqtt_client));
     ESP_ERROR_CHECK(esp_mqtt_client_stop(mqtt_client));
+    ESP_ERROR_CHECK(esp_mqtt_client_destroy(mqtt_client));
     ESP_ERROR_CHECK(esp_wifi_disconnect());
     ESP_ERROR_CHECK(esp_wifi_stop());
 }
@@ -394,4 +398,28 @@ void wifi_send_mqtt_temperature(void)
 void start_wifi(void)
 {
     xTaskCreate(wifi_task, "wifi", 2048, NULL, WIFI_TASK_PRIORITY, NULL);
+}
+
+void emit_mqtt_status(void)
+{
+    printf("MQTT information:\n");
+    printf("\tURI:\t%s\n", current_config.mqtt_uri);
+    printf("\tConnected:\t");
+    if (status.mqtt_connected) {
+        printf("Yes\n");
+    }
+    else {
+        printf("No\n");
+    }
+
+    printf("\tTopic:\t%s\n", current_config.mqtt_topic);
+    printf("\tSubscribed:\t");
+    if (status.mqtt_subscribed) {
+        printf("Yes\n");
+    }
+    else {
+        printf("No\n");
+    }
+
+    
 }
