@@ -83,9 +83,7 @@ void app_main(void)
     // read config pre-zeroes the structure passed in, so there's no explicit
     // need to zero current_config on boot.
     if (read_config_from_nvs(&current_config)) {
-
-        // FIXME - this should be forked off into a background task so it can
-        // run in the background while the console starts in the foreground.
+        // Once we've read in our config, enable wifi.
         wifi_enable();
     }
     else {
