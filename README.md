@@ -103,7 +103,14 @@ Example links are provided for clarity, in cases where the hardware is uncommon.
      fan, heat, or cool. If this is not true, and you have enough zones, you can
      exceed the overall current rating for the board. For example, if we turn on
      fan and heat for 3 zones at the stated 10mA power consumption, we will end
-     up at 60mA, which is more than the allowed aggregate across all GPIO contacts.
+     up at 60mA, which is more than the allowed aggregate across all GPIO
+     contacts.
+  * 24VAC to 5V buck converter
+    * I used
+      https://smile.amazon.com/SMAKN%C2%AE-Converter-Voltage-Supply-Waterproof/dp/B00RE6QN4U
+      soldered to the power and ground pins of a USB wire.
+    * The logic here is that we can power it from the 24VAC that's readily
+      available at the equipment and won't have to use an additional power brick.
 
 ##### Misc supplies and equipment
 
