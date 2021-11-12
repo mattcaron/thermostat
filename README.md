@@ -40,7 +40,7 @@ which you then consume in NodeRED (also below) and make it do what you want.
   1. Config: Done
   1. OneWire to DS18B20: Done
   1. WiFi refactor: Done
-  1. MQTT: In progress
+  1. MQTT: Done
   1. Power saving deep sleep: Not started
 1. Wiring diagram: Not started
 1. Case design: Not started
@@ -59,8 +59,57 @@ programmer.
 
 1. Hardware selection: Completed, needs documentation and schematic.
 1. Firmware: Not started.
-  1. RPi base uses RPiOS + NodeRed + Some MQTT broker
+  1. RPi base uses RPiOS + NodeRed + Mosquitto MQTT broker
   1. Firmware will be a NodeRed program; example will be provided.
+
+#### BOM
+
+Example links are provided for clarity, in cases where the hardware is uncommon.
+
+##### Hardware list
+
+1. Raspberry Pi 3B+
+   * RPi4 would likely work with minimal modification to these
+   instructions.
+1. SD card 
+   * 32GB is fine.
+1. RPi screw terminal expansion board with status LEDs
+   * https://smile.amazon.com/GeeekPi-Raspberry-Terminal-Breakout-Expansion/dp/B08GKSF1MD
+   * Not strictly necessary, as one can just wire directly to the header block,
+     but screw terminals ensure positive connections that won't pull out on you.
+1. Some solid state relay modules
+   * I bought one of
+     https://smile.amazon.com/SainSmart-Channel-Duemilanove-MEGA2560-MEGA1280/dp/B00ZZVQR5Q
+     for each of my zones.
+   * You can get ones with more or fewer relays as needed.
+   * Note that you will need at least 3 for a common setup:
+     * Fan
+     * Cooling
+     * Heating
+
+     More advanced setups (for example, multistage heating and cooling) will
+     require more contacts.
+   * You can use mechanical relays if you like, as they are cheaper. However,
+     they draw more current and will (eventually) mechanically wear out. The RPi
+     3B+ GPIOs are spec-ed at max 16mA per channel, with 50mA aggregate.
+       * This article from arrow explains it well:
+         https://www.arrow.com/en/research-and-events/articles/crydom-solid-state-relays-vs-electromechanical-relays
+       * Using some commonly available numbers as an example, the stated typical
+         current draw for a commonly used electromechanical relay was 70mA,
+         wheras it was 10mA for the SSR (though in both cases, actual measured
+         current draw in situ was about an order of magnitude less).
+   * Note that there is a bit of a cheat here - I assume that only one
+     contact will be closed at any given time per zone - that is, only one of
+     fan, heat, or cool. If this is not true, and you have enough zones, you can
+     exceed the overall current rating for the board. For example, if we turn on
+     fan and heat for 3 zones at the stated 10mA power consumption, we will end
+     up at 60mA, which is more than the allowed aggregate across all GPIO contacts.
+
+##### Misc supplies and equipment
+
+1. Stranded wire for connecting screw terminals to relays.
+1. Tools - strippers, small screwdrivers, etc.
+1. Some lengths of furnace wire for connecting to HVAC equipment or a zone controller.
 
 ## Security notes
 
