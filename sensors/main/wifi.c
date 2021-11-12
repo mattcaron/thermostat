@@ -285,12 +285,20 @@ static void connect_wifi(void)
  */
 static void disconnect_wifi(void)
 {
-    ESP_ERROR_CHECK(esp_mqtt_client_unsubscribe(mqtt_client,
-                                                current_config.mqtt_topic));
-    ESP_ERROR_CHECK(esp_mqtt_client_disconnect(mqtt_client));
+    if (status.mqtt_subscribed) {
+        ESP_ERROR_CHECK(esp_mqtt_client_unsubscribe(mqtt_client,
+                                                    current_config.mqtt_topic));
+    }
+    if (status.mqtt_connected) {
+        ESP_ERROR_CHECK(esp_mqtt_client_disconnect(mqtt_client));
+    }
+
     ESP_ERROR_CHECK(esp_mqtt_client_stop(mqtt_client));
     ESP_ERROR_CHECK(esp_mqtt_client_destroy(mqtt_client));
-    ESP_ERROR_CHECK(esp_wifi_disconnect());
+
+    if (status.wifi_connected) {
+        ESP_ERROR_CHECK(esp_wifi_disconnect());
+    }
     ESP_ERROR_CHECK(esp_wifi_stop());
 }
 
