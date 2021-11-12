@@ -13,7 +13,7 @@ Let's address that, shall we?
 
 ![HACK THE PLANET!!!](./hack-the-planet.gif)
 
-# Getting started
+## Getting started
 
 Clone this as follows:
 
@@ -61,6 +61,33 @@ programmer.
 1. Firmware: Not started.
   1. RPi base uses RPiOS + NodeRed + Some MQTT broker
   1. Firmware will be a NodeRed program; example will be provided.
+
+## Security notes
+
+### WiFi
+
+Connecting to networks with crappy (or no) security is allowed. It's your
+funeral.
+
+### SSL
+
+The default firmware does not do CA certificate verification on the cert
+presented by the MQTT server. This is because the common case for this
+application is nodes in one's house talking to a controller via a private
+network with an internal, private DNS. As a result, it is most likely that a
+self signed certificate is in use here, especially since even a minimally
+verified certificate such as LetsEncrypt won't work because it can't even do a
+basic DNS lookup on the MQTT broker. Having that selfsigned cert be validated
+would require the user to recompile the firmware with the CA cert used to sign
+the server key built in. This is definitely possible, and any users who wish to
+do such a thing can figure it out (look at
+`examples/protocols/mqtt/ssl/main/app_main.c` and the initialization of
+`mqtt_cfg` in `mqtt_start` in `main/wifi.c`). However, I'm not going to bother
+with it, as even using SSL is barely commensurate with the level of risk
+presented here - especially when one takes into account using a secured WiFi
+network. We're at 2 levels of encryption and credentials, and I'm not going lose
+any sleep over the fact that the second layer of encryption is not as strong as
+it could be.
 
 ## License
 
