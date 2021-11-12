@@ -103,7 +103,8 @@ static void emit_set_help(void)
     printf("    " CONFIG_SET_PASS
            " = password for AP (%d char max).\n", MAX_PASSPHRASE_LEN);
     printf("    " CONFIG_SET_NAME
-           " = the name of this station (%d char max).\n",
+           " = the name of this station (%d char max).\n"
+           "        Note: This is used for the client ID.\n",
            MAX_STATION_NAME_LEN);
     printf("        Note: surround the name with quotes if you use spaces.\n");
     printf("    " CONFIG_SET_TEMP_UNIT
@@ -113,7 +114,10 @@ static void emit_set_help(void)
            "            (max %u).\n", UINT16_MAX);
     printf("        Note: this has battery implications. Lower values will\n"
            "        consume more battery, higher values will be less responsive.\n");
-    printf("    " CONFIG_SET_MQTT_URI " = MQTT URI (%d char max).\n",
+    printf("    " CONFIG_SET_MQTT_URI
+           " = MQTT URI (%d char max).\n" 
+           "        Note: This should be of the form:\n"
+                        "mqtt[s]://[username][:password]@host.domain[:port]",
            MAX_MQTT_URI_LEN);
     printf("    " CONFIG_SET_MQTT_TOPIC " = MQTT topic (%d char max).\n",
            MAX_MQTT_TOPIC_LEN);
