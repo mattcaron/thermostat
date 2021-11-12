@@ -137,8 +137,12 @@ static void mqtt_start(void)
 {
     const esp_mqtt_client_config_t mqtt_cfg = {
         .uri = current_config.mqtt_uri,
-// TODO - figure out SSL connections
-//        .cert_pem = (const char *)mqtt_eclipse_org_pem_start,
+        .client_id = current_config.station_name,
+        // Not setting .cert_pem implicitly disables certificate verification,
+        // which is what we actually want - since the common case for this
+        // application is to use a selfsigned cert inside a closed network - or
+        // even no encryption at all, which will happen if one uses an mqtt://
+        // URL instead of an mqtts:// URL.
     };
 
     mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
