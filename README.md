@@ -45,6 +45,25 @@ which you then consume in NodeRED (also below) and make it do what you want.
 1. Wiring diagram: Not started
 1. Case design: Not started
 
+#### BOM
+
+Example links are provided for clarity, in cases where the hardware is uncommon.
+
+##### Hardware list
+
+You will need one of each of these items for each "puck".
+
+1. NodeMCU Wireless Mini D1 ESP-12F Board
+   * Either v2 or v3 should work fine.
+   * https://smile.amazon.com/gp/product/B08QZ2887K
+1. 3 AAA battery holder with leads
+   * https://smile.amazon.com/gp/product/B0156V1JGQ
+1. DS18B20 - Get the actual Maxim one.
+   * I used the genuine article here, because I tried a couple of knockoffs and
+    they lacked the ability to save configuration and were less precise than the
+    actual Maxim product.
+   * https://www.mouser.com/ProductDetail/?qs=7H2Jq%252ByxpJKpIDCbiq4lfg%3D%3D
+
 ### Base station
 
 This is not intended to be a plug and go - users are expected
