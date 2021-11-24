@@ -43,7 +43,7 @@ void wifi_send_mqtt_temperature(void);
 
 /**
  * Print various MQTT items.
- * 
+ *
  * Unlike the WiFi stack, the MQTT client doesn't have a "get_info" type
  * function, so fake it with our config and internal status.
  */

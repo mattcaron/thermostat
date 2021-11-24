@@ -236,7 +236,7 @@ static void temp_task(void *pvParameters)
         else {
             last_temp_is_valid = false;
             ESP_LOGI(TAG, "Temperature read invalid - not doing anything.");
-        }            
+        }
 
         // we recalculate this every time through the loop in case the config
         // gets changed.

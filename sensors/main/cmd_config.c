@@ -115,9 +115,9 @@ static void emit_set_help(void)
     printf("        Note: this has battery implications. Lower values will\n"
            "        consume more battery, higher values will be less responsive.\n");
     printf("    " CONFIG_SET_MQTT_URI
-           " = MQTT URI (%d char max).\n" 
+           " = MQTT URI (%d char max).\n"
            "        Note: This should be of the form:\n"
-                        "mqtt[s]://[username][:password]@host.domain[:port]\n",
+           "mqtt[s]://[username][:password]@host.domain[:port]\n",
            MAX_MQTT_URI_LEN);
     printf("    " CONFIG_SET_MQTT_TOPIC " = MQTT topic (%d char max).\n",
            MAX_MQTT_TOPIC_LEN);
