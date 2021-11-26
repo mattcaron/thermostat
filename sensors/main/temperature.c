@@ -238,15 +238,18 @@ static void temp_task(void *pvParameters)
             ESP_LOGI(TAG, "Temperature read invalid - not doing anything.");
         }
 
+        // While there are any MQTT messages outstanding, sleep for 10ms until
+        // they are sent.
+        while(get_mqtt_outstanding_messages_() > 0) {
+            vTaskDelay(10 * portTICK_PERIOD_MS);
+        }
+
         // we recalculate this every time through the loop in case the config
         // gets changed.
         interval = (current_config.poll_time_sec * 1000) /
                    portTICK_PERIOD_MS;
 
         // TODO - replace this with a deep sleep.
-        // NOTE: we don't want to go to sleep until the MQTT message is
-        // actually sent, so we'll have to check for that before we go to
-        // sleep.
         vTaskDelayUntil(&last_wake_time, interval);
     }
 }

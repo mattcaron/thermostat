@@ -45,6 +45,7 @@ static EventGroupHandle_t wifi_mqtt_status;
 #define MQTT_STARTED       BIT3 /**< MQTT has been started. */
 #define MQTT_CONNECTED     BIT4 /**< MQTT has connected to the MQTT server. */
 #define MQTT_SUBSCRIBED    BIT5 /**< MQTT has subscribed to the topic. */
+#define MQTT_MSG_IN_FLIGHT BIT6 /**< MQTT has a message in flight. */
 
 #define WIFI_MAXIMUM_RETRIES 3  /**< Maximum connection retries. */
 
@@ -53,6 +54,8 @@ static const char *TAG = "WiFi";
 static int s_retry_num = 0;
 
 esp_mqtt_client_handle_t mqtt_client = NULL;
+
+static unsigned int mqtt_outstanding_messages = 0;
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
                                int32_t event_id, void *event_data)
@@ -89,7 +92,12 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
             break;
 
         case MQTT_EVENT_PUBLISHED:
+            // This event, when used with QoS 1 or 2 (we are using 1), will be
+            // posted when the broker accepts the message handoff. Hence, it is
+            // pretty reliable (that's what QoS is for after all), and we can
+            // safely go to sleep once the count reaches 0.
             ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
+            --mqtt_outstanding_messages;
             break;
 
         case MQTT_EVENT_DATA:
@@ -355,8 +363,8 @@ static void wifi_task(void *pvParameters)
                     status = xEventGroupGetBits(wifi_mqtt_status);
                     if (status & WIFI_CONNECTED) {
                         ESP_LOGI(TAG,
-                                  "WiFi already connected, discarding "
-                                  "spurious WIFI_START message");
+                                 "WiFi already connected, discarding "
+                                 "spurious WIFI_START message");
                     }
                     else {
                         if (is_config_valid(&current_config)) {
@@ -388,6 +396,11 @@ static void wifi_task(void *pvParameters)
                                           1,
                                           false);
                         if (mqtt_msg_id >= 0) {
+                            // We submitted a message to MQTT and it is now in
+                            // flight. The temp task checks this count via //
+                            // get_mqtt_messages_oustanding before going to
+                            // sleep.
+                            ++mqtt_outstanding_messages;
                             ESP_LOGI(TAG, "mqtt publish successful, msg_id=%d",
                                      mqtt_msg_id);
                         }
@@ -481,4 +494,9 @@ void emit_mqtt_status(void)
             printf("No\n");
         }
     }
+}
+
+unsigned int get_mqtt_outstanding_messages_(void)
+{
+    return mqtt_outstanding_messages;
 }

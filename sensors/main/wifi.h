@@ -49,4 +49,12 @@ void wifi_send_mqtt_temperature(void);
  */
 void emit_mqtt_status(void);
 
+/**
+ * Get the count of MQTT messages outstanding.
+ *
+ * @return the count of mqtt messages which have not yet been acknowledged as
+ *         having been sent.
+ */
+unsigned int get_mqtt_outstanding_messages_(void);
+
 #endif // __WIFI_H_
