@@ -68,14 +68,18 @@ bool read_config_from_nvs(config_storage_t *config)
 
     ret = nvs_open(NVS_CONFIG_NAMESPACE, NVS_READONLY, &handle);
     if (ret == ESP_ERR_NVS_NOT_FOUND) {
-        /* The first time we open this, it can fail if the namespace
-         * doesn't exist. It would create it, except we opened it read only.
-         * So, open it read write, just once. But, since it is newly created,
-         * we can skip the rest of the logic, since we haven't stored anything
-         * yet. Since we zero the config structure above, no further work is
+        /* The first time we open this, it can fail if the namespace doesn't
+         * exist. It would create it, except we opened it read only. So, open it
+         * read write, just once. But, since it is newly created, we can skip
+         * the rest of the logic, since we haven't stored anything yet. Since we
+         * zero the config structure above, very little further work is
          * necessary, just an open and close.
          */
         ESP_ERROR_CHECK(nvs_open(NVS_CONFIG_NAMESPACE, NVS_READWRITE, &handle));
+
+        // One thing we do have to do is set the default polling interval,
+        // otherwise it will go nuts polling until the WDT resets it.
+        config->poll_time_sec = POLL_TIME_DEFAULT_SEC;
     }
     else {
         // Catch any other errors not related to it not being there.
