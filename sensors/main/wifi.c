@@ -36,8 +36,10 @@
 #include "temperature.h"
 
 struct {
+    unsigned int wifi_started : 1;
     unsigned int wifi_connected : 1;
     unsigned int mqtt_connected : 1;
+    unsigned int mqtt_started : 1;
     unsigned int mqtt_subscribed : 1;
 } status;
 
@@ -259,7 +261,9 @@ static void connect_wifi(void)
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
+
     ESP_ERROR_CHECK(esp_wifi_start());
+    status.wifi_started = true;
 
     ESP_LOGI(TAG, "WiFi config finished.");
 
@@ -301,14 +305,17 @@ static void disconnect_wifi(void)
     if (status.mqtt_connected) {
         ESP_ERROR_CHECK(esp_mqtt_client_disconnect(mqtt_client));
     }
-
-    ESP_ERROR_CHECK(esp_mqtt_client_stop(mqtt_client));
-    ESP_ERROR_CHECK(esp_mqtt_client_destroy(mqtt_client));
+    if (status.mqtt_started) {
+        ESP_ERROR_CHECK(esp_mqtt_client_stop(mqtt_client));
+        ESP_ERROR_CHECK(esp_mqtt_client_destroy(mqtt_client));
+    }
 
     if (status.wifi_connected) {
         ESP_ERROR_CHECK(esp_wifi_disconnect());
     }
-    ESP_ERROR_CHECK(esp_wifi_stop());
+    if (status.wifi_started) {
+        ESP_ERROR_CHECK(esp_wifi_stop());
+    }
 }
 
 /**
@@ -425,21 +432,27 @@ void start_wifi(void)
 void emit_mqtt_status(void)
 {
     printf("MQTT information:\n");
-    printf("\tURI:\t%s\n", current_config.mqtt_uri);
-    printf("\tConnected:\t");
-    if (status.mqtt_connected) {
-        printf("Yes\n");
+    if (!status.mqtt_started) {
+        printf("\tStarted: No\n");
     }
     else {
-        printf("No\n");
-    }
+        printf("\tStarted: No\n");
+        printf("\tURI:\t%s\n", current_config.mqtt_uri);
+        printf("\tConnected:\t");
+        if (status.mqtt_connected) {
+            printf("Yes\n");
+        }
+        else {
+            printf("No\n");
+        }
 
-    printf("\tTopic:\t%s\n", current_config.mqtt_topic);
-    printf("\tSubscribed:\t");
-    if (status.mqtt_subscribed) {
-        printf("Yes\n");
-    }
-    else {
-        printf("No\n");
+        printf("\tTopic:\t%s\n", current_config.mqtt_topic);
+        printf("\tSubscribed:\t");
+        if (status.mqtt_subscribed) {
+            printf("Yes\n");
+        }
+        else {
+            printf("No\n");
+        }
     }
 }
