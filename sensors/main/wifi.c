@@ -199,6 +199,14 @@ static void wifi_init(void)
 
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
+    /* Belt and suspenders for storage to RAM.
+     * Here's the story - the menuconfig item ESP8266_WIFI_NVS_ENABLED
+     * determines whether it should write to NVS (flash) or not. We have this
+     * disabled, so it shouldn't write to NVS. Setting the storage here should
+     * effectively do the same thing, so - belt and suspenders.
+     */
+    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID,
                     &wifi_event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP,
