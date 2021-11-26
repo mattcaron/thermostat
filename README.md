@@ -55,9 +55,9 @@ You will need one of each of these items for each "puck".
 
 1. NodeMCU Wireless Mini D1 ESP-12F Board
    * Either v2 or v3 should work fine.
-   * https://smile.amazon.com/gp/product/B08QZ2887K
+   * https://www.amazon.com/dp/B073CQVFLK
 1. 3 AAA battery holder with leads
-   * https://smile.amazon.com/gp/product/B0156V1JGQ
+   * https://www.amazon.com/gp/product/B0156V1JGQ
 1. DS18B20 - Get the actual Maxim one.
    * I used the genuine article here, because I tried a couple of knockoffs and
     they lacked the ability to save configuration and were less precise than the
@@ -93,12 +93,12 @@ Example links are provided for clarity, in cases where the hardware is uncommon.
 1. SD card 
    * 32GB is fine.
 1. RPi screw terminal expansion board with status LEDs
-   * https://smile.amazon.com/GeeekPi-Raspberry-Terminal-Breakout-Expansion/dp/B08GKSF1MD
+   * https://www.amazon.com/GeeekPi-Raspberry-Terminal-Breakout-Expansion/dp/B08GKSF1MD
    * Not strictly necessary, as one can just wire directly to the header block,
      but screw terminals ensure positive connections that won't pull out on you.
 1. Some solid state relay modules
    * I bought one of
-     https://smile.amazon.com/SainSmart-Channel-Duemilanove-MEGA2560-MEGA1280/dp/B00ZZVQR5Q
+     https://www.amazon.com/SainSmart-Channel-Duemilanove-MEGA2560-MEGA1280/dp/B00ZZVQR5Q
      for each of my zones.
    * You can get ones with more or fewer relays as needed.
    * Note that you will need at least 3 for a common setup:
@@ -126,7 +126,7 @@ Example links are provided for clarity, in cases where the hardware is uncommon.
      contacts.
   * 24VAC to 5V buck converter
     * I used
-      https://smile.amazon.com/SMAKN%C2%AE-Converter-Voltage-Supply-Waterproof/dp/B00RE6QN4U
+      https://www.amazon.com/SMAKN%C2%AE-Converter-Voltage-Supply-Waterproof/dp/B00RE6QN4U
       soldered to the power and ground pins of a USB wire.
     * The logic here is that we can power it from the 24VAC that's readily
       available at the equipment and won't have to use an additional power brick.
