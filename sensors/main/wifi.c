@@ -35,19 +35,16 @@
 #include "config_storage.h"
 #include "temperature.h"
 
-struct {
-    unsigned int wifi_started : 1;
-    unsigned int wifi_connected : 1;
-    unsigned int mqtt_connected : 1;
-    unsigned int mqtt_started : 1;
-    unsigned int mqtt_subscribed : 1;
-} status;
-
 /* FreeRTOS event group to signal when we are connected*/
-static EventGroupHandle_t s_wifi_event_group;
+static EventGroupHandle_t wifi_mqtt_status;
 
-#define WIFI_CONNECTED_BIT BIT0 /**< We have connected to the AP. */
-#define WIFI_FAIL_BIT      BIT1 /**< We have failed to connect to the AP. */
+/** Definition bits for the above status. */
+#define WIFI_STARTED       BIT0 /**< WiFi has been started. */
+#define WIFI_CONNECTED     BIT1 /**< WiFi has connected to the AP. */
+#define WIFI_FAIL          BIT2 /**< WiFi has failed to connect to the AP. */
+#define MQTT_STARTED       BIT3 /**< MQTT has been started. */
+#define MQTT_CONNECTED     BIT4 /**< MQTT has connected to the MQTT server. */
+#define MQTT_SUBSCRIBED    BIT5 /**< MQTT has subscribed to the topic. */
 
 #define WIFI_MAXIMUM_RETRIES 3  /**< Maximum connection retries. */
 
@@ -69,7 +66,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
     switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
-            status.mqtt_connected = true;
+            xEventGroupSetBits(wifi_mqtt_status, MQTT_CONNECTED);
             msg_id = esp_mqtt_client_subscribe(client,
                                                current_config.mqtt_topic,
                                                1);
@@ -78,17 +75,17 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
 
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
-            status.mqtt_connected = false;
+            xEventGroupClearBits(wifi_mqtt_status, MQTT_CONNECTED);
             break;
 
         case MQTT_EVENT_SUBSCRIBED:
             ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
-            status.mqtt_subscribed = true;
+            xEventGroupSetBits(wifi_mqtt_status, MQTT_SUBSCRIBED);
             break;
 
         case MQTT_EVENT_UNSUBSCRIBED:
             ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
-            status.mqtt_subscribed = false;
+            xEventGroupClearBits(wifi_mqtt_status, MQTT_SUBSCRIBED);
             break;
 
         case MQTT_EVENT_PUBLISHED:
@@ -154,7 +151,7 @@ static void mqtt_start(void)
                         mqtt_event_handler,
                         mqtt_client));
     ESP_ERROR_CHECK(esp_mqtt_client_start(mqtt_client));
-    status.mqtt_started = true;
+    xEventGroupSetBits(wifi_mqtt_status, MQTT_STARTED);
 }
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
@@ -165,13 +162,19 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     }
     else if (event_base == WIFI_EVENT &&
              event_id == WIFI_EVENT_STA_DISCONNECTED) {
+
+        // We got disconnected, make sure connected bit is clear.
+        xEventGroupClearBits(wifi_mqtt_status,
+                             WIFI_CONNECTED);
+
         if (s_retry_num < WIFI_MAXIMUM_RETRIES) {
             ESP_ERROR_CHECK(esp_wifi_connect());
             s_retry_num++;
             ESP_LOGI(TAG, "retry to connect to the AP");
         }
         else {
-            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+            // Give up on connecting so we don't spin here forever.
+            xEventGroupSetBits(wifi_mqtt_status, WIFI_FAIL);
         }
         ESP_LOGI(TAG,"connect to the AP fail");
     }
@@ -179,8 +182,10 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
         ESP_LOGI(TAG, "got ip:%s",
                  ip4addr_ntoa(&event->ip_info.ip));
+        // We've successfully connected, so reset our connection attempts
+        // counter and set our connected bit.
         s_retry_num = 0;
-        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+        xEventGroupSetBits(wifi_mqtt_status, WIFI_CONNECTED);
     }
 }
 
@@ -194,7 +199,7 @@ static void wifi_init(void)
 {
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
 
-    s_wifi_event_group = xEventGroupCreate();
+    wifi_mqtt_status = xEventGroupCreate();
 
     ESP_ERROR_CHECK(esp_netif_init());
 
@@ -263,30 +268,29 @@ static void connect_wifi(void)
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
 
     ESP_ERROR_CHECK(esp_wifi_start());
-    status.wifi_started = true;
+    xEventGroupSetBits(wifi_mqtt_status, WIFI_STARTED);
 
     ESP_LOGI(TAG, "WiFi config finished.");
 
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT)
      * or connection failed for the maximum number of re-tries (WIFI_FAIL_BIT). * The bits are set by wifi_event_handler() (see above). */
-    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
-                                           WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-                                           pdFALSE,
-                                           pdFALSE,
-                                           portMAX_DELAY);
+    EventBits_t status = xEventGroupWaitBits(
+                             wifi_mqtt_status,
+                             WIFI_CONNECTED | WIFI_FAIL,
+                             pdFALSE,
+                             pdFALSE,
+                             portMAX_DELAY);
 
-    /* xEventGroupWaitBits() returns the bits before the call returned, hence
-     * we can test which event actually happened. */
-    if (bits & WIFI_CONNECTED_BIT) {
+    if (status & WIFI_CONNECTED) {
         ESP_LOGI(TAG, "connected to SSID: %s", wifi_config.sta.ssid);
-        status.wifi_connected = true;
 
         // We are now connected to WiFi, so do our MQTT connection stuff
         mqtt_start();
     }
-    else if (bits & WIFI_FAIL_BIT) {
+    else if (status & WIFI_FAIL) {
         ESP_LOGI(TAG, "Failed to connect to SSID: %s", wifi_config.sta.ssid);
-        status.wifi_connected = false;
+        // We don't need to clear the connected bit, because it's cleared when
+        // we get the disconnected event in the event handler.
     }
     else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
@@ -298,23 +302,27 @@ static void connect_wifi(void)
  */
 static void disconnect_wifi(void)
 {
-    if (status.mqtt_subscribed) {
+    EventBits_t status = xEventGroupGetBits(wifi_mqtt_status);
+
+    if (status & MQTT_SUBSCRIBED) {
         ESP_ERROR_CHECK(esp_mqtt_client_unsubscribe(mqtt_client,
                         current_config.mqtt_topic));
     }
-    if (status.mqtt_connected) {
+    if (status & MQTT_CONNECTED) {
         ESP_ERROR_CHECK(esp_mqtt_client_disconnect(mqtt_client));
     }
-    if (status.mqtt_started) {
+    if (status & MQTT_STARTED) {
         ESP_ERROR_CHECK(esp_mqtt_client_stop(mqtt_client));
         ESP_ERROR_CHECK(esp_mqtt_client_destroy(mqtt_client));
     }
 
-    if (status.wifi_connected) {
+    if (status & WIFI_CONNECTED) {
         ESP_ERROR_CHECK(esp_wifi_disconnect());
     }
-    if (status.wifi_started) {
+    if (status & WIFI_STARTED) {
         ESP_ERROR_CHECK(esp_wifi_stop());
+        // We don't deinit the WiFi, because it's not necessary - the config is
+        // set in connect_wifi, right before esp_wifi_start.
     }
 }
 
@@ -334,6 +342,8 @@ static void wifi_task(void *pvParameters)
     char buffer[6];
     int mqtt_msg_id;
 
+    EventBits_t status;
+
     // basic wifi init (without configuration)
     wifi_init();
 
@@ -342,19 +352,32 @@ static void wifi_task(void *pvParameters)
             switch(message) {
                 case WIFI_START:
                     // TODO: Add some blinkenlights feedback here?
-                    if (is_config_valid(&current_config)) {
-                        ESP_LOGI(TAG, "wifi config looks valid, connecting");
-                        connect_wifi();
+                    status = xEventGroupGetBits(wifi_mqtt_status);
+                    if (status & WIFI_CONNECTED) {
+                        ESP_LOGI(TAG,
+                                  "WiFi already connected, discarding "
+                                  "spurious WIFI_START message");
                     }
                     else {
-                        ESP_LOGI(TAG, "invalid config, not connecting to wifi");
+                        if (is_config_valid(&current_config)) {
+                            ESP_LOGI(TAG,
+                                     "wifi config looks valid, connecting");
+                            connect_wifi();
+                        }
+                        else {
+                            ESP_LOGI(TAG,
+                                     "invalid config, not connecting to wifi");
+                        }
                     }
                     break;
                 case WIFI_STOP:
+                    // No extraneous checks here, because the disconnect WiFi
+                    // function checks extensively to not double-free something.
                     disconnect_wifi();
                     break;
                 case WIFI_SEND_MQTT:
-                    if (status.mqtt_subscribed) {
+                    status = xEventGroupGetBits(wifi_mqtt_status);
+                    if (status & MQTT_SUBSCRIBED) {
                         memset(buffer, 0, sizeof(buffer));
                         sprintf(buffer, "%.1f", get_last_temp());
                         mqtt_msg_id = esp_mqtt_client_publish(
@@ -374,7 +397,8 @@ static void wifi_task(void *pvParameters)
                     }
                     else {
                         ESP_LOGI(TAG,
-                                 "MQTT not subscribed, not publishing message.");
+                                 "MQTT not subscribed, "
+                                 "not publishing message.");
                     }
                     break;
                 default:
@@ -431,15 +455,17 @@ void start_wifi(void)
 
 void emit_mqtt_status(void)
 {
+    EventBits_t status = xEventGroupGetBits(wifi_mqtt_status);
+
     printf("MQTT information:\n");
-    if (!status.mqtt_started) {
+    if (!(status & MQTT_STARTED)) {
         printf("\tStarted: No\n");
     }
     else {
         printf("\tStarted: No\n");
         printf("\tURI:\t%s\n", current_config.mqtt_uri);
         printf("\tConnected:\t");
-        if (status.mqtt_connected) {
+        if (status & MQTT_CONNECTED) {
             printf("Yes\n");
         }
         else {
@@ -448,7 +474,7 @@ void emit_mqtt_status(void)
 
         printf("\tTopic:\t%s\n", current_config.mqtt_topic);
         printf("\tSubscribed:\t");
-        if (status.mqtt_subscribed) {
+        if (status & MQTT_SUBSCRIBED) {
             printf("Yes\n");
         }
         else {
