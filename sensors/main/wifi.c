@@ -247,9 +247,9 @@ static void connect_wifi(void)
 {
     wifi_config_t wifi_config = {};
 
-    strncpy((char *)&wifi_config.sta.ssid, current_config.ssid,
+    strncpy((char *)wifi_config.sta.ssid, current_config.ssid,
             sizeof(wifi_config.sta.ssid));
-    strncpy((char *)&wifi_config.sta.password, current_config.pass,
+    strncpy((char *)wifi_config.sta.password, current_config.pass,
             sizeof(wifi_config.sta.password));
 
     /* NOTE: In the example code, they ratchet up the minimum security to
