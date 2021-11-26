@@ -419,7 +419,7 @@ void wifi_send_mqtt_temperature(void)
 
 void start_wifi(void)
 {
-    xTaskCreate(wifi_task, "wifi", 2048, NULL, WIFI_TASK_PRIORITY, NULL);
+    xTaskCreate(wifi_task, "wifi", 3072, NULL, WIFI_TASK_PRIORITY, NULL);
 }
 
 void emit_mqtt_status(void)
