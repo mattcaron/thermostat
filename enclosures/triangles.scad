@@ -55,7 +55,7 @@ module Triangle(
 	polyhedron(
 		points=[	pointAB1, pointBC1, pointCA1,
 					pointAB2, pointBC2, pointCA2 ],
-		triangles=[	
+		faces=[	
 			[0, 1, 2],
 			[3, 5, 4],
 			[0, 3, 1],
