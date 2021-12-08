@@ -43,7 +43,11 @@ which you then consume in NodeRED (also below) and make it do what you want.
   1. MQTT: Done
   1. Power saving deep sleep: Not started
 1. Wiring diagram: Not started
-1. Case design: Not started
+1. Case design: In progress
+
+**TODO:**
+
+1. Implement CLI command completion hinting (see iperf example code)
 
 #### BOM
 
@@ -76,7 +80,7 @@ programmer.
 
 **Status:** Not started
 
-1. Hardware selection: Completed, needs documentation and schematic.
+1. Hardware selection: Completed, needs schematic.
 1. Firmware: Not started.
   1. RPi base uses RPiOS + NodeRed + Mosquitto MQTT broker
   1. Firmware will be a NodeRed program; example will be provided.
@@ -166,5 +170,26 @@ it could be.
 
 ## License
 
-Broadly speaking, this code is licensed under the 3-Clause BSD license.
-However, it incorporates various third party modules that have their own licenses, in which case those licenses apply. If there is ever a conflict (for example, a derived work), then the terms of that license have precedence. See the LICENSE file for more details.
+Broadly speaking, this code is licensed under the 3-Clause BSD license. However,
+it incorporates various third party modules that have their own licenses, in
+which case those licenses apply. If there is ever a conflict (for example, a
+derived work), then the terms of that license have precedence. See the LICENSE
+file for more details.
+
+## FAQ
+
+### **Y U NO ZIGBEE?**
+
+Because I have WiFi coverage all over my house, and the cost is about the same.
+I will grant you that battery life would be better with Zigbee, but that's not
+the only consideration in play here.
+
+### **What's all this about your data and huge coporations?**
+
+Maybe it's because I don't like being the product. Maybe I just read too much
+cyberpunk. Maybe I just am a little paranoid. Or maybe I'm just a control freak.
+Take your best guess.
+
+### **But, half the links are to Amazon!**
+
+Yeah, I'm a hypocrite too, what's your point?

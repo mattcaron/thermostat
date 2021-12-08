@@ -4,3 +4,6 @@
 [submodule "sensors/esp-idf-lib"]
 	path = sensors/esp-idf-lib
 	url = https://github.com/mattcaron/esp-idf-lib
+[submodule "enclosures/Chamfers-for-OpenSCAD"]
+	path = enclosures/Chamfers-for-OpenSCAD
+	url = https://github.com/SebiTimeWaster/Chamfers-for-OpenSCAD.git
