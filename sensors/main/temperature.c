@@ -4,6 +4,7 @@
  */
 
 #include "esp_log.h"
+#include "esp_sleep.h"
 #include <driver/gpio.h>
 #include <ds18x20.h>
 #include "freertos/FreeRTOS.h"
@@ -192,7 +193,8 @@ static void temp_task(void *pvParameters)
     bool successful_read;
     int retries;
     TickType_t last_wake_time = xTaskGetTickCount();
-    TickType_t interval = 0;
+    TickType_t now;
+    uint64_t interval_microseconds = 0;
 
     float temp_temp;
 
@@ -239,19 +241,50 @@ static void temp_task(void *pvParameters)
             ESP_LOGI(TAG, "Temperature read invalid - not doing anything.");
         }
 
+        ESP_LOGI(TAG, "Waiting for MQTT queue to be empty.");
         // While there are any MQTT messages outstanding, sleep for 10ms until
         // they are sent.
         while(get_mqtt_outstanding_messages_() > 0) {
             vTaskDelay(10 * portTICK_PERIOD_MS);
         }
 
+        // Once the queue is empty, we can disable WiFi.
+
+        ESP_LOGI(TAG, "Disabling WiFi");
+        // we're about to go sleep; disable wifi so it comes down gracefully.
+        wifi_disable();
+
         // we recalculate this every time through the loop in case the config
         // gets changed.
-        interval = (current_config.poll_time_sec * 1000) /
-                   portTICK_PERIOD_MS;
+        interval_microseconds = current_config.poll_time_sec * 1000000;
 
-        // TODO - replace this with a deep sleep.
-        vTaskDelayUntil(&last_wake_time, interval);
+        // and we need to account for the time we spent executing 
+        now = xTaskGetTickCount();
+
+        // adjust the interval down by that amount so it's properly periodic
+        interval_microseconds = (now - last_wake_time) * 
+                                    portTICK_PERIOD_MS * 1000;
+        
+        ESP_LOGI(TAG, "Waiting for WiFi off.");
+        // we've done our calculations, wait for WiFi to come down and then go
+        // to sleep
+        wait_for_wifi_off();
+
+#if 1
+        ESP_LOGI(TAG, "Deep sleep for %lld us.", interval_microseconds);
+
+        esp_deep_sleep(interval_microseconds);
+#else
+        ESP_LOGI(TAG, "Normal sleep for %lld us.", interval_microseconds);
+
+        vTaskDelay((interval_microseconds / 1000) / portTICK_PERIOD_MS);
+#endif
+        // reset last_wake_time
+        last_wake_time = xTaskGetTickCount();
+
+        ESP_LOGI(TAG, "Waking up");
+        // Enable WiFi again, then loop.
+        wifi_enable();
     }
 }
 
