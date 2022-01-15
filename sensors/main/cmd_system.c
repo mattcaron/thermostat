@@ -19,6 +19,7 @@
 #include "argtable3/argtable3.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "temperature.h"
 
 #ifdef CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS
 #define WITH_TASKS_INFO 1
@@ -31,6 +32,7 @@ static void register_heap(void);
 static void register_version(void);
 static void register_restart(void);
 static void register_tasks(void);
+static void register_nosleep(void);
 
 void register_system(void)
 {
@@ -39,6 +41,7 @@ void register_system(void)
     register_version();
     register_restart();
     register_tasks();
+    register_nosleep();
 }
 
 /* 'version' command */
@@ -156,6 +159,26 @@ static void register_tasks(void)
         .help = "Get information about running tasks",
         .hint = NULL,
         .func = &tasks_info,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
+static int disable_sleep(int argc, char **argv)
+{
+    disable_deep_sleep();
+    printf("Deep sleep disabled.\n");
+    printf("Perform any needed configuration, then issue a `restart` \n"
+           "command to re-enable deep sleep.\n");
+    return 0;
+}
+
+static void register_nosleep(void)
+{
+    const esp_console_cmd_t cmd = {
+        .command = "nosleep",
+        .help = "Disable sleep mode",
+        .hint = NULL,
+        .func = &disable_sleep,
     };
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }

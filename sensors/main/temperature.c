@@ -29,6 +29,11 @@ float last_temp = 0;
 // The last temperature is valid.
 bool last_temp_is_valid = false;
 
+// Use deep sleep. Defaults to true, but can be disabled via a console command.
+// Note that there is no way to re-enable it; we just assume the user will 
+// reboot the whole unit (and instruct them to do so).
+bool use_deep_sleep = true;
+
 /**
  * Turn on our sensor.
  */
@@ -272,15 +277,17 @@ static void temp_task(void *pvParameters)
         // to sleep
         wait_for_wifi_off();
 
-#if 1
-        ESP_LOGI(TAG, "Deep sleep for %lld us.", interval_microseconds);
+        if (use_deep_sleep) {
+            ESP_LOGI(TAG, "Deep sleep for %lld us.", interval_microseconds);
 
-        esp_deep_sleep(interval_microseconds);
-#else
-        ESP_LOGI(TAG, "Normal sleep for %lld us.", interval_microseconds);
+            esp_deep_sleep(interval_microseconds);
+        }
+        else {
+            ESP_LOGI(TAG, "Normal sleep for %lld us.", interval_microseconds);
 
-        vTaskDelay((interval_microseconds / 1000) / portTICK_PERIOD_MS);
-#endif
+            vTaskDelay((interval_microseconds / 1000) / portTICK_PERIOD_MS);
+        }
+
         // reset last_wake_time
         last_wake_time = xTaskGetTickCount();
 
@@ -298,4 +305,9 @@ float get_last_temp(void)
 void start_temp_polling(void)
 {
     xTaskCreate(temp_task, "temp", 2048, NULL, TEMP_TASK_PRIORITY, NULL);
+}
+
+void disable_deep_sleep(void)
+{
+    use_deep_sleep = false;
 }

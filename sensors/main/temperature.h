@@ -31,4 +31,9 @@ float get_last_temp(void);
  */
 void start_temp_polling(void);
 
+/**
+ * Disable deep sleep.
+ */
+void disable_deep_sleep(void);
+
 #endif // __TEMPERATURE_H_

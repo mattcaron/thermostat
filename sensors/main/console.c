@@ -139,6 +139,10 @@ static void console_task(void *pvParameters)
            "Use UP/DOWN arrows to navigate through command history.\n"
            "Press TAB when typing command name to auto-complete.\n");
 
+    printf("\n"
+           LOG_COLOR(LOG_COLOR_RED)
+           "NOTE: Type nosleep RIGHT NOW to disable deep sleep and reset.\n");
+
     /* Figure out if the terminal supports escape sequences */
     int probe_status = linenoiseProbe();
     if (probe_status) { /* zero indicates success */
