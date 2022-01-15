@@ -19,8 +19,8 @@ static const char *TAG = "temperature";
 #define SENSOR_GPIO GPIO_NUM_12
 
 // From the datasheet, with R0 and R1 both 0, the 9 bit resolution takes
-// 93.75ms to do the conversion.
-#define MEASUREMENT_DELAY_MS 94
+// 93.75ms to do the conversion. This gives it slightly more time.
+#define MEASUREMENT_DELAY_MS 95
 
 // The last temperature we read.
 float last_temp = 0;
@@ -214,6 +214,7 @@ static void temp_task(void *pvParameters)
                  * warm. I'm willing to take that risk.
                 */
                 successful_read = false;
+                ESP_LOGW(TAG, "Discarding default reading of 85");
             }
             --retries;
         }
