@@ -22,6 +22,7 @@
 #include "esp_netif.h"
 #include "esp_event.h"
 #include "esp_wifi.h"
+#include "esp_sleep.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "queues.h"
@@ -39,13 +40,15 @@
 static EventGroupHandle_t wifi_mqtt_status;
 
 /** Definition bits for the above status. */
-#define WIFI_STARTED       BIT0 /**< WiFi has been started. */
-#define WIFI_CONNECTED     BIT1 /**< WiFi has connected to the AP. */
-#define WIFI_FAIL          BIT2 /**< WiFi has failed to connect to the AP. */
-#define MQTT_STARTED       BIT3 /**< MQTT has been started. */
-#define MQTT_CONNECTED     BIT4 /**< MQTT has connected to the MQTT server. */
-#define MQTT_SUBSCRIBED    BIT5 /**< MQTT has subscribed to the topic. */
-#define MQTT_MSG_IN_FLIGHT BIT6 /**< MQTT has a message in flight. */
+#define WIFI_OFF           BIT0 /**< WiFi is off. */
+#define WIFI_STOPPING      BIT1 /**< WiFi is in the process of being stopped. */
+#define WIFI_STARTED       BIT2 /**< WiFi has been started. */
+#define WIFI_CONNECTED     BIT3 /**< WiFi has connected to the AP. */
+#define WIFI_FAIL          BIT4 /**< WiFi has failed to connect to the AP. */
+#define MQTT_STARTED       BIT5 /**< MQTT has been started. */
+#define MQTT_CONNECTED     BIT6 /**< MQTT has connected to the MQTT server. */
+#define MQTT_SUBSCRIBED    BIT7 /**< MQTT has subscribed to the topic. */
+#define MQTT_QUEUE_EMPTY   BIT8 /**< MQTT has a no messages in flight. */
 
 #define WIFI_MAXIMUM_RETRIES 3  /**< Maximum connection retries. */
 
@@ -54,8 +57,6 @@ static const char *TAG = "WiFi";
 static int s_retry_num = 0;
 
 esp_mqtt_client_handle_t mqtt_client = NULL;
-
-static unsigned int mqtt_outstanding_messages = 0;
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
                                int32_t event_id, void *event_data)
@@ -97,7 +98,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
             // pretty reliable (that's what QoS is for after all), and we can
             // safely go to sleep once the count reaches 0.
             ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
-            --mqtt_outstanding_messages;
+            xEventGroupSetBits(wifi_mqtt_status, MQTT_QUEUE_EMPTY);
             break;
 
         case MQTT_EVENT_DATA:
@@ -165,6 +166,8 @@ static void mqtt_start(void)
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data)
 {
+    EventBits_t status;
+
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         ESP_ERROR_CHECK(esp_wifi_connect());
     }
@@ -175,16 +178,24 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         xEventGroupClearBits(wifi_mqtt_status,
                              WIFI_CONNECTED);
 
-        if (s_retry_num < WIFI_MAXIMUM_RETRIES) {
-            ESP_ERROR_CHECK(esp_wifi_connect());
-            s_retry_num++;
-            ESP_LOGI(TAG, "retry to connect to the AP");
+        // If we are in the process of stopping, or if WiFi is off, DO NOT try
+        // to connect - doing so causes an error.
+        status = xEventGroupGetBits(wifi_mqtt_status);
+        if (status & (WIFI_OFF | WIFI_STOPPING)) {
+            ESP_LOGI(TAG, "WiFI is shutting down, not reconnecting.");
         }
         else {
-            // Give up on connecting so we don't spin here forever.
-            xEventGroupSetBits(wifi_mqtt_status, WIFI_FAIL);
+            if (s_retry_num < WIFI_MAXIMUM_RETRIES) {
+                ESP_ERROR_CHECK(esp_wifi_connect());
+                s_retry_num++;
+                ESP_LOGI(TAG, "retry to connect to the AP");
+            }
+            else {
+                // Give up on connecting so we don't spin here forever.
+                xEventGroupSetBits(wifi_mqtt_status, WIFI_FAIL);
+            }
+            ESP_LOGI(TAG,"connect to the AP fail");
         }
-        ESP_LOGI(TAG,"connect to the AP fail");
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
@@ -209,11 +220,19 @@ static void wifi_init(void)
 
     wifi_mqtt_status = xEventGroupCreate();
 
+    // Some bits are set for off/disabled/empty - set those now, because we
+    // start with wifi stopped and the queue empty.
+    xEventGroupSetBits(wifi_mqtt_status, WIFI_OFF | MQTT_QUEUE_EMPTY);
+
     ESP_ERROR_CHECK(esp_netif_init());
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
+    // Set radio to not recalibrate after deep sleep and wakeup, to save power.
+    // Note that this is has no return value, so there is nothing to check.
+    esp_deep_sleep_set_rf_option(2);
 
     /* Belt and suspenders for storage to RAM.
      * Here's the story - the menuconfig item ESP8266_WIFI_NVS_ENABLED
@@ -261,6 +280,8 @@ static void wifi_deinit(void)
 static void connect_wifi(void)
 {
     wifi_config_t wifi_config = {};
+
+    xEventGroupClearBits(wifi_mqtt_status, WIFI_OFF);
 
     strncpy((char *)wifi_config.sta.ssid, current_config.ssid,
             sizeof(wifi_config.sta.ssid));
@@ -311,17 +332,34 @@ static void connect_wifi(void)
 static void disconnect_wifi(void)
 {
     EventBits_t status = xEventGroupGetBits(wifi_mqtt_status);
+    
+    // signal that we are in the process of stopping WiFi and shouldn't try to 
+    // reconnect, etc.
+    xEventGroupSetBits(wifi_mqtt_status, WIFI_STOPPING);
 
     if (status & MQTT_SUBSCRIBED) {
-        ESP_ERROR_CHECK(esp_mqtt_client_unsubscribe(mqtt_client,
-                        current_config.mqtt_topic));
+        // This doesn't return an esp_err_t, but rather a message id, with -1
+        // being an error, so we check for that instead.
+        if (esp_mqtt_client_unsubscribe(mqtt_client,
+                                        current_config.mqtt_topic) == -1) {
+            ESP_LOGE(TAG, "Error unsubscribing from MQTT topic");
+        }
+        else {
+            // Successfully unsubscribed, but this doesn't always generate an
+            // event, so clear it here as well.
+            xEventGroupClearBits(wifi_mqtt_status, MQTT_SUBSCRIBED);
+        }
     }
     if (status & MQTT_CONNECTED) {
         ESP_ERROR_CHECK(esp_mqtt_client_disconnect(mqtt_client));
+        // Successfully disconnected, but this doesn't always generate an
+        // event, so clear it here as well.
+        xEventGroupClearBits(wifi_mqtt_status, MQTT_CONNECTED);
     }
     if (status & MQTT_STARTED) {
         ESP_ERROR_CHECK(esp_mqtt_client_stop(mqtt_client));
         ESP_ERROR_CHECK(esp_mqtt_client_destroy(mqtt_client));
+        xEventGroupClearBits(wifi_mqtt_status, MQTT_STARTED);
     }
 
     if (status & WIFI_CONNECTED) {
@@ -331,7 +369,13 @@ static void disconnect_wifi(void)
         ESP_ERROR_CHECK(esp_wifi_stop());
         // We don't deinit the WiFi, because it's not necessary - the config is
         // set in connect_wifi, right before esp_wifi_start.
+        xEventGroupClearBits(wifi_mqtt_status, WIFI_STARTED);
     }
+
+    // WiFi is now off.
+    xEventGroupSetBits(wifi_mqtt_status, WIFI_OFF);
+    // Since it is off, we are no longer stopping.
+    xEventGroupClearBits(wifi_mqtt_status, WIFI_STOPPING);
 }
 
 /**
@@ -396,11 +440,6 @@ static void wifi_task(void *pvParameters)
                                           1,
                                           false);
                         if (mqtt_msg_id >= 0) {
-                            // We submitted a message to MQTT and it is now in
-                            // flight. The temp task checks this count via //
-                            // get_mqtt_messages_oustanding before going to
-                            // sleep.
-                            ++mqtt_outstanding_messages;
                             ESP_LOGI(TAG, "mqtt publish successful, msg_id=%d",
                                      mqtt_msg_id);
                         }
@@ -458,6 +497,10 @@ void wifi_send_mqtt_temperature(void)
 {
     uint8_t message = WIFI_SEND_MQTT;
 
+    // We are going to queue up and send a message, so clear this status bit
+    // until we've done so.
+    xEventGroupClearBits(wifi_mqtt_status, MQTT_QUEUE_EMPTY);
+
     xQueueSend(wifi_queue, &message, portMAX_DELAY);
 }
 
@@ -496,7 +539,30 @@ void emit_mqtt_status(void)
     }
 }
 
-unsigned int get_mqtt_outstanding_messages_(void)
+void wait_for_mqtt_subscribed(void)
 {
-    return mqtt_outstanding_messages;
+    xEventGroupWaitBits(wifi_mqtt_status,
+                        MQTT_SUBSCRIBED,
+                        pdFALSE,
+                        pdFALSE,
+                        portMAX_DELAY);
+
+}
+
+void wait_for_mqtt_queue_empty(void)
+{
+    xEventGroupWaitBits(wifi_mqtt_status,
+                        MQTT_QUEUE_EMPTY,
+                        pdFALSE,
+                        pdFALSE,
+                        portMAX_DELAY);
+}
+
+void wait_for_wifi_off(void)
+{
+    xEventGroupWaitBits(wifi_mqtt_status,
+                        WIFI_OFF,
+                        pdFALSE,
+                        pdFALSE,
+                        portMAX_DELAY);
 }

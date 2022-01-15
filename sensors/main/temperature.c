@@ -221,6 +221,10 @@ static void temp_task(void *pvParameters)
             --retries;
         }
 
+        ESP_LOGI(TAG, "Waiting for MQTT subscription.");
+        // Wait for mqtt to be subscribed before attempting to send our message
+        wait_for_mqtt_subscribed();
+
         if (successful_read) {
             // good temp, update
             last_temp = temp_temp;
@@ -244,9 +248,7 @@ static void temp_task(void *pvParameters)
         ESP_LOGI(TAG, "Waiting for MQTT queue to be empty.");
         // While there are any MQTT messages outstanding, sleep for 10ms until
         // they are sent.
-        while(get_mqtt_outstanding_messages_() > 0) {
-            vTaskDelay(10 * portTICK_PERIOD_MS);
-        }
+        wait_for_mqtt_queue_empty();
 
         // Once the queue is empty, we can disable WiFi.
 

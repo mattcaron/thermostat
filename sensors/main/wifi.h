@@ -50,11 +50,18 @@ void wifi_send_mqtt_temperature(void);
 void emit_mqtt_status(void);
 
 /**
- * Get the count of MQTT messages outstanding.
- *
- * @return the count of mqtt messages which have not yet been acknowledged as
- *         having been sent.
+ * Wait for MQTT to be successfully subscribed.
  */
-unsigned int get_mqtt_outstanding_messages_(void);
+void wait_for_mqtt_subscribed(void);
+
+/**
+ * Wait for the MQTT queue to be empty.
+ */
+void wait_for_mqtt_queue_empty(void);
+
+/**
+ * Wait for WiFi to be turned off.
+ */
+void wait_for_wifi_off(void);
 
 #endif // __WIFI_H_
