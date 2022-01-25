@@ -179,7 +179,7 @@ module makeEnclosureLid() {
         }
         // wiring chase
         translate([10,0,0]) {
-            cube([enclosure_lid_depth + delta - 15,5,12],center=true);
+            cube([enclosure_lid_depth + delta - 15,10,12],center=true);
         }
     }
 }
