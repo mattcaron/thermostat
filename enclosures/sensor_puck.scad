@@ -26,37 +26,41 @@ enclosure_divider_delta = enclosure_wall_thickness+wall_gap+3;
 
 hole_spacing = 26.85;
 
-showAssembledUnit();
+// showAssembledUnit();
 
-// showItemsForPrinting();
+showItemsForPrinting();
 
 // Render the unit, with internal components, assembled in situ.
 // Comment out bits here to see how things are and do development.
 module showAssembledUnit() {
     makeComponents();
-    // makeEnclosureLid();
+    makeEnclosureLid();
     makeEnclosureBase();
     makeEnclosureDivider();
 }
 
 module showItemsForPrinting() {
+/*
     translate([0,0,14]) {
         rotate([90,-90,0]) {
             makeEnclosureBase();
         }
     }
+*/
 
-    translate([65,0,20]) {
+    translate([0,0,20]) {
         rotate([90,90,0]) {
             makeEnclosureLid();
         }
     }
-    
-    translate([-60,0,-7]) {
+
+/*
+    translate([0,0,-7]) {
         rotate([90,-90,0]) {
             makeEnclosureDivider();
         }
-    }   
+    }
+*/
 }
 
 // Make the lid of the enclosure, which contains the
@@ -121,7 +125,6 @@ module makeEnclosureLid() {
                        -(enclosure_height/2-delta)]) {
                 cube([enclosure_lid_depth/2,2,4], center=true);
             }
-            // vents in box
             translate([enclosure_wall_thickness,
                        0,
                        enclosure_height/2-delta]) {
@@ -153,8 +156,8 @@ module makeEnclosureLid() {
     
     // standoffs to which we screw the battery box
     difference() {
-        translate([10, 0, 0]) {
-            cube([enclosure_lid_depth - 15,
+        translate([13, 0, 0]) {
+            cube([enclosure_lid_depth - 20,
                   enclosure_length - enclosure_wall_thickness,
                   5],
                   center=true);
