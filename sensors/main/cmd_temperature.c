@@ -45,11 +45,14 @@ static void emit_temperature_help(void)
 static void read_and_print_temperature(void)
 {
     float temperature = get_last_temp();
+    // last_temp is converted to the configured unit when it is sampled, so the
+    // conditional logic is really just for the correct label.
+    printf("Temperature is %.1f°", temperature);
     if (current_config.use_celsius) {
-        printf("Temperature is %.1f°C\n", temperature);
+        printf("C\n");
     }
     else {
-        printf("Temperature is %.1f°F\n", c_to_f(temperature));
+        printf("F\n");
     }
 }
 

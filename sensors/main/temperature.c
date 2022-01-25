@@ -232,15 +232,16 @@ static void temp_task(void *pvParameters)
 
         if (successful_read) {
             // good temp, update
-            last_temp = temp_temp;
-            last_temp_is_valid = true;
-
             if (current_config.use_celsius) {
+                last_temp = temp_temp;
                 ESP_LOGI(TAG, "Read temp: %.1f°C", last_temp);
             }
             else {
-                ESP_LOGI(TAG, "Read temp: %.1f°F", c_to_f(last_temp));
+                last_temp = c_to_f(temp_temp);
+                ESP_LOGI(TAG, "Read temp: %.1f°F", last_temp);
             }
+            
+            last_temp_is_valid = true;
 
             // We've read our temperature, wake up our WiFi task to send it.
             wifi_send_mqtt_temperature();
