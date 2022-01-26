@@ -26,9 +26,6 @@ static const char *TAG = "temperature";
 // The last temperature we read.
 float last_temp = 0;
 
-// The last temperature is valid.
-bool last_temp_is_valid = false;
-
 // Use deep sleep. Defaults to true, but can be disabled via a console command.
 // Note that there is no way to re-enable it; we just assume the user will 
 // reboot the whole unit (and instruct them to do so).
@@ -240,14 +237,11 @@ static void temp_task(void *pvParameters)
                 last_temp = c_to_f(temp_temp);
                 ESP_LOGI(TAG, "Read temp: %.1f°F", last_temp);
             }
-            
-            last_temp_is_valid = true;
 
             // We've read our temperature, wake up our WiFi task to send it.
             wifi_send_mqtt_temperature();
         }
         else {
-            last_temp_is_valid = false;
             ESP_LOGI(TAG, "Temperature read invalid - not doing anything.");
         }
 
