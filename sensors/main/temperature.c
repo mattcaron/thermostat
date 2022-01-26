@@ -149,6 +149,7 @@ static bool check_and_fix_18b20_configuration(void)
          */
         if ((scratchpad[4] & 0xE0) == 0) {
             ESP_LOGI(TAG, "Temperature sensor config is correct.");
+            success = true;
         }
         else {
             scratchpad[4] = scratchpad[4] & 0x1F;
