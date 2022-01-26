@@ -196,7 +196,7 @@ float c_to_f(float celsius)
  */
 static void temp_task(void *pvParameters)
 {
-    bool successful_read;
+    bool comms_success;
     int retries;
     TickType_t last_wake_time = xTaskGetTickCount();
     TickType_t now;
@@ -205,15 +205,20 @@ static void temp_task(void *pvParameters)
     float temp_temp;
 
     // Check and fix our sensor config.
-    check_and_fix_18b20_configuration();
+    comms_success = false;
+    retries = 5;
+    while (!comms_success && retries > 0 ) {
+        comms_success = check_and_fix_18b20_configuration();
+        --retries;
+    }
 
     while (true) {
-        successful_read = false;
+        comms_success = false;
         retries = 5; // prevent infinite tight loop
 
-        while (!successful_read && retries > 0 ) {
-            successful_read = read_temperature(&temp_temp);
-            if (successful_read && temp_temp == 85) {
+        while (!comms_success && retries > 0 ) {
+            comms_success = read_temperature(&temp_temp);
+            if (comms_success && temp_temp == 85) {
                 /* 85 is the power on reset value and sometimes our call to
                  * kick off a temperature conversion silently fails, resulting
                  * in no conversion happening. Since this is for residential
@@ -221,7 +226,7 @@ static void temp_task(void *pvParameters)
                  * put us into an infinite loop if it were ever to get that
                  * warm. I'm willing to take that risk.
                 */
-                successful_read = false;
+                comms_success = false;
                 ESP_LOGW(TAG, "Discarding default reading of 85");
             }
             --retries;
@@ -231,7 +236,7 @@ static void temp_task(void *pvParameters)
         // Wait for mqtt to be subscribed before attempting to send our message
         wait_for_mqtt_subscribed();
 
-        if (successful_read) {
+        if (comms_success) {
             // good temp, update
             if (current_config.use_celsius) {
                 last_temp = temp_temp;
