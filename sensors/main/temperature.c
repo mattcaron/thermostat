@@ -261,25 +261,21 @@ static void temp_task(void *pvParameters)
 
         // Once the queue is empty, we can disable WiFi.
 
-        ESP_LOGI(TAG, "Disabling WiFi");
-        // we're about to go sleep; disable wifi so it comes down gracefully.
+        ESP_LOGI(TAG, "Waiting for WiFi off.");
+        // we're about to go sleep; disable wifi so it comes down gracefully,
+        // and then wait for it to actually be down.
         wifi_disable();
+        wait_for_wifi_off();
 
-        // we recalculate this every time through the loop in case the config
-        // gets changed.
-        interval_microseconds = current_config.poll_time_sec * 1000000;
-
-        // and we need to account for the time we spent executing 
+        // and we need to account for the time we spent executing, above.
         now = xTaskGetTickCount();
 
-        // adjust the interval down by that amount so it's properly periodic
-        interval_microseconds = (now - last_wake_time) * 
-                                    portTICK_PERIOD_MS * 1000;
-        
-        ESP_LOGI(TAG, "Waiting for WiFi off.");
-        // we've done our calculations, wait for WiFi to come down and then go
-        // to sleep
-        wait_for_wifi_off();
+        // Calculate our periodic time delay, making sure to get the poll time
+        // from the config so it's always up to date, and subtracting off the
+        // time we spent executing.
+        interval_microseconds =
+            current_config.poll_time_sec * 1000000 -
+            (now - last_wake_time) * portTICK_PERIOD_MS * 1000;
 
         if (use_deep_sleep) {
             ESP_LOGI(TAG, "Deep sleep for %lld us.", interval_microseconds);
