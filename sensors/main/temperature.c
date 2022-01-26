@@ -18,6 +18,7 @@
 static const char *TAG = "temperature";
 
 #define SENSOR_GPIO GPIO_NUM_12
+#define POWER_GPIO GPIO_NUM_13
 
 // From the datasheet, with R0 and R1 both 0, the 9 bit resolution takes
 // 93.75ms to do the conversion. This gives it slightly more time.
@@ -36,11 +37,12 @@ bool use_deep_sleep = true;
  */
 static void sensor_on(void)
 {
-    /* Set pullup mode on comms pin so the bus works.
-     * The internal pullup violates the datasheet recommendations,
-     * but works, and saves us an external resistor.
+    /* Turn on the power, and set pullup mode on comms pin so the bus works.
+     * The internal pullup violates the datasheet recommendations, but works,
+     * and saves us an external resistor.
      */
-    gpio_set_pull_mode(SENSOR_GPIO, GPIO_PULLUP_ONLY);
+    ESP_ERROR_CHECK(gpio_set_level(POWER_GPIO, 1));
+    ESP_ERROR_CHECK(gpio_set_pull_mode(SENSOR_GPIO, GPIO_PULLUP_ONLY));
 }
 
 /**
@@ -48,11 +50,12 @@ static void sensor_on(void)
  */
 static void sensor_off(void)
 {
-    /* We've now gotten the temperature, turn off the bus line, and
-     * pull the bus line down avoid current leakage across the pullup.
+    /* We've now gotten the temperature, turn off the power and bus lines,
+     * and pull the bus line down avoid current leakage across the pullup.
      */
-    gpio_set_level(SENSOR_GPIO, 0);
-    gpio_set_pull_mode(SENSOR_GPIO, GPIO_PULLDOWN_ONLY);
+    ESP_ERROR_CHECK(gpio_set_level(SENSOR_GPIO, 0));
+    ESP_ERROR_CHECK(gpio_set_level(POWER_GPIO, 0));
+    ESP_ERROR_CHECK(gpio_set_pull_mode(SENSOR_GPIO, GPIO_PULLDOWN_ONLY));
 }
 
 /**

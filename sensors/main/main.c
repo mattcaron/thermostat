@@ -42,7 +42,7 @@ static void initialize_nvs(void)
  * Initalize our sensor GPIOs.
  *
  * For starters, all of them are set to outputs and turned off. We'll turn
- * the bus on when we need it and power it via parasite mode.
+ * the comms and power on when we need them.
  */
 void init_sensor_gpios(void)
 {
@@ -56,6 +56,9 @@ void init_sensor_gpios(void)
     ESP_ERROR_CHECK(gpio_set_level(GPIO_NUM_12, 0));
     ESP_ERROR_CHECK(gpio_set_level(GPIO_NUM_13, 0));
     ESP_ERROR_CHECK(gpio_set_level(GPIO_NUM_14, 0));
+    ESP_ERROR_CHECK(gpio_set_pull_mode(GPIO_NUM_12, GPIO_PULLDOWN_ONLY));
+    ESP_ERROR_CHECK(gpio_set_pull_mode(GPIO_NUM_13, GPIO_PULLDOWN_ONLY));
+    ESP_ERROR_CHECK(gpio_set_pull_mode(GPIO_NUM_14, GPIO_PULLDOWN_ONLY));
 }
 
 /**
