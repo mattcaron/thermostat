@@ -247,6 +247,8 @@ static void temp_task(void *pvParameters)
         comms_success = false;
         retries = 5; // prevent infinite tight loop
 
+        ESP_LOGW(TAG, "Starting temperature sampling.");
+
         while (!comms_success && retries > 0 ) {
             comms_success = read_temperature(&temp_temp);
             if (comms_success && temp_temp == 85) {
@@ -271,18 +273,18 @@ static void temp_task(void *pvParameters)
             // good temp, update
             if (current_config.use_celsius) {
                 last_temp = temp_temp;
-                ESP_LOGI(TAG, "Read temp: %.1f°C", last_temp);
+                ESP_LOGW(TAG, "Read temp: %.1f°C", last_temp);
             }
             else {
                 last_temp = c_to_f(temp_temp);
-                ESP_LOGI(TAG, "Read temp: %.1f°F", last_temp);
+                ESP_LOGW(TAG, "Read temp: %.1f°F", last_temp);
             }
 
             // We've read our temperature, wake up our WiFi task to send it.
             wifi_send_mqtt_temperature();
         }
         else {
-            ESP_LOGI(TAG, "Temperature read invalid - not doing anything.");
+            ESP_LOGE(TAG, "Temperature read invalid - not doing anything.");
         }
 
         ESP_LOGI(TAG, "Waiting for MQTT queue to be empty.");
@@ -309,12 +311,12 @@ static void temp_task(void *pvParameters)
             (now - last_wake_time) * portTICK_PERIOD_MS * 1000;
 
         if (use_deep_sleep) {
-            ESP_LOGI(TAG, "Deep sleep for %lld us.", interval_microseconds);
+            ESP_LOGW(TAG, "Deep sleep for %lld us.", interval_microseconds);
 
             esp_deep_sleep(interval_microseconds);
         }
         else {
-            ESP_LOGI(TAG, "Normal sleep for %lld us.", interval_microseconds);
+            ESP_LOGW(TAG, "Normal sleep for %lld us.", interval_microseconds);
 
             vTaskDelay((interval_microseconds / 1000) / portTICK_PERIOD_MS);
         }
