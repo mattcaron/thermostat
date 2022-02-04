@@ -357,7 +357,10 @@ static void disconnect_wifi(void)
         xEventGroupClearBits(wifi_mqtt_status, MQTT_CONNECTED);
     }
     if (status & MQTT_STARTED) {
-        ESP_ERROR_CHECK(esp_mqtt_client_stop(mqtt_client));
+        /* One would think that an esp_mqtt_client_stop would be necessary here,
+         * but having it generates a runtime log warning about it already being
+         * stopped.
+         */
         ESP_ERROR_CHECK(esp_mqtt_client_destroy(mqtt_client));
         xEventGroupClearBits(wifi_mqtt_status, MQTT_STARTED);
     }
