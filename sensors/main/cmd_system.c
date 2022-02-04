@@ -20,6 +20,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "temperature.h"
+#include "version.h"
 
 #ifdef CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS
 #define WITH_TASKS_INFO 1
@@ -61,6 +62,7 @@ static int get_version(int argc, char **argv)
            "/External-Flash:",
            spi_flash_get_chip_size() / (1024 * 1024), " MB");
     printf("\trevision number:%d\r\n", info.revision);
+    printf("\nSoftware version %d.%d.%d\n", SW_MAJOR, SW_MINOR, SW_PATCH);
     return 0;
 }
 

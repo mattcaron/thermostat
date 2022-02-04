@@ -23,6 +23,7 @@
 #include "cmd_wifi.h"
 #include "cmd_temperature.h"
 #include "priorities.h"
+#include "version.h"
 
 // Plain prompt is the station name with a >, a space, and a NUL.
 char plain_prompt[MAX_STATION_NAME_LEN+3];
@@ -134,10 +135,11 @@ static void console_task(void *pvParameters)
 
     printf("\n"
            LOG_COLOR(LOG_COLOR_BLUE)
-           "Welcome to the ESP sensor module.\n"
+           "Welcome to the ESP sensor module version %d.%d.%d.\n"
            "Type 'help' to get the list of commands.\n"
            "Use UP/DOWN arrows to navigate through command history.\n"
-           "Press TAB when typing command name to auto-complete.\n");
+           "Press TAB when typing command name to auto-complete.\n",
+           SW_MAJOR, SW_MINOR, SW_PATCH);
 
     printf("\n"
            LOG_COLOR(LOG_COLOR_RED)
