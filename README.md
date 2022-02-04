@@ -36,7 +36,7 @@ which you then consume in NodeRED (also below) and make it do what you want.
 
 **Roadmap:**
 
-1. Hardware selection: Completed, needs schematic.
+1. Hardware selection: Completed
 1. Firmware: Done (v1.0.0)
    1. Console: Done
    1. Config: Done
@@ -49,12 +49,30 @@ which you then consume in NodeRED (also below) and make it do what you want.
 
 **TODO:**
 
-1. Implement CLI command completion hinting (see iperf example code)
+(May never be implemented)
+
+1. Implement CLI command completion hinting (see iperf example code).
 
 **Notes:**
 
-1. When you flash the firmware, the config is retained, as it is stored in a
-   different flash partition.
+1. **MAKE SURE YOU DO NOT CONNECT TO BOTH USB AND BATTERIES**. Seriously - the
+   batteries are going to push somewhere between 3V and 4.5V and the USB is
+   going to push 5V so it's likely to try to charge the batteries and that is
+   probably not going to end well. Remove the batteries, *then* plug in USB.
+   This should be a pretty easy mistake to avoid since this assumes a battery
+   holder with screw holes behind the batteries - in order to upgrade firmware,
+   you need to take the whole thing apart, and the first step to doing that is
+   pulling out the batteries.
+1. When you flash the firmware:
+   1. The config is retained, as it is stored in a different flash partition
+      than the firmware.
+   1. You need to pull out the jumper wire between D0 and RST. This connection
+      is necessary for deep sleep, but messes up the automatic reset circuit
+      for flashing.
+   1. If the delay between plugging in USB and starting the flashing process is
+      too long, the board will go to deep sleep (from which it will not actually
+      wake - see above) and not flash properly. If the flashing fails, hit the
+      reset button, then start the flash process again.
 1. I originally implemented this using 9 bit DS18B20 resolution, but the 0.5 C
    resolution was lacking. After profiling where we were spending our time, the
    overwhelming majority of it was spent waiting to bring ip WiFi, get an IP,
@@ -62,6 +80,8 @@ which you then consume in NodeRED (also below) and make it do what you want.
    resolution (12 bit) conversion, giving us 0.0625C resolution.
 
 **Known bugs:**
+
+(May never be implemented)
 
 1. If you save the config at the wrong time, it can try to take down WiFi when
    it is already being brought down so the unit can go to sleep. This causes an
@@ -95,6 +115,17 @@ You will need one of each of these items for each "puck".
         fine. Your mileage may vary. See `sensors/main/temperature.c` and set
         `SENSOR_CONFIG_REG_VALUE` and `MEASUREMENT_DELAY_MS` accordingly.
    * https://www.mouser.com/ProductDetail/?qs=7H2Jq%252ByxpJKpIDCbiq4lfg%3D%3D
+1. Wire of appropriate gauge - one spool each of red and black (for power and
+   ground) and another for signal (orange, yellow, blue, etc.) in 22 AWD should
+   work fine here.
+1. Heat shrink tubing for the above - you're going to be soldering to the ends
+   of the DS18B20 sensor and you'll want to heat shrink over them to ensure you
+   don't get any shorts.
+   * Alternatively, if you want to do slightly less soldering, you could find a
+     3 pin pigtail lead with breadboard (2.54mm) pin spacing, plug the DS18B20's
+     into the plug end and solder the other end to the ESP board. But, wire is
+     cheaper and I rather enjoy soldering - it lets me catch up on my Oak
+     Island. Your call.
 
 #### Enclosure
 
@@ -111,6 +142,46 @@ rationale being that it should survive the temperature fluctuations and UV
 exposure a little better than PLA, but mainly because I wanted an excuse to get
 PETG printing dialed in on my printer - it's still pretty stringy, but vastly
 improved versus the beginning of the project.
+
+In addition to whatever filament you will be using, you will also need
+sufficient self-tapping screws to fasten the battery holder to the lid of the
+enclosure - with the screws passing through the divider. I used M3 x 12mm wood
+screws, as that was the head profile for which my battery holders were made.
+
+Please note that the holes in both the lid and divider are merely intended to be
+pilot holes. Since I do not know what size screw you plan to use, I cannot
+ensure the correct dimension. As such, 2 drill bits will be needed.
+
+The first must be larger than your screw and, ideally, the same diameter as the
+holes in the battery holder. The goal here is to have the screw threads *not*
+engage with the plastic in either the divider or the battery holder.
+
+The second should be the diameter of your screws sans threads - the idea being
+that the self-tapping screws will cut walls into the printed standoff parts of
+the lid.
+
+Given that you will be removing some material from the walls of the standoffs so
+the screws do not crack the plastic, it is necessary to ensure thick enough
+walls for them to not be to thin. I recommend a minimum of 2mm thick walls when
+printing the lid.
+
+The divider is intended to ensure that the board and thermostat stay in
+position, with the CPU located under the upper vent and the DS18B20 positioned
+just above the lower vent. The idea here is that the CPU will heat up and the
+warm air will vent out the top. Ambient air will be drawn in and over the
+temperature sensor, theoretically giving a more accurate reading (and surely
+more accurate than if the DS18B20 was on above the CPU, with the CPU sitting
+there baking it). The horizontal protrusions into which one screws the battery
+case and divider are intended to serve as a heat brake as well.
+
+Finally, note that there are no clips on this assembly, as it is meant to be
+stuck to the wall with some variety of double stick tape (I like the 3M command
+strips). As such, the base is stuck to the wall and the lid, batteries, board,
+etc. just pull straight off. They are held in place by gravity and a small
+amount of friction. The fit is snug, but not tight. As such, mounting it on the
+ceiling is not advised, as it will almost certainly work loose from the
+vibrations of people walking through the building and invariably land on your
+cat's head. (Don't say I didn't warn you.)
 
 ### Base station
 
