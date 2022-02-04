@@ -3,6 +3,7 @@
 ## Introduction
 
 Let's face it - all these thermostat products you can buy today are any or many of:
+
 1. stupid expensive,
 1. flawed in some way
 1. don't do exactly what you want (see above)
@@ -17,7 +18,7 @@ Let's address that, shall we?
 
 Clone this as follows:
 
-```
+```shell
 git clone --recursive https://github.com/mattcaron/thermostat.git
 ```
 
@@ -25,7 +26,7 @@ This will get this repo and all the submodules uses (such as the Espressif repos
 
 ## Components
 
-### Thermometer puck sensors:
+### Thermometer puck sensors
 
 This is intended to be pretty turnkey. Build it, flash it, configure it,
 stick it on the wall. It will send MQTT messages to your broker (see below)
@@ -34,20 +35,43 @@ which you then consume in NodeRED (also below) and make it do what you want.
 **Status:** In progress. See the `sensors` subdirectory.
 
 **Roadmap:**
-1. Hardware selection: Completed, needs documentation and schematic.
-1. Firmware: In progress
-  1. Console: Done
-  1. Config: Done
-  1. OneWire to DS18B20: Done
-  1. WiFi refactor: Done
-  1. MQTT: Done
-  1. Power saving deep sleep: Not started
+
+1. Hardware selection: Completed, needs schematic.
+1. Firmware: Done (v1.0.0)
+   1. Console: Done
+   1. Config: Done
+   1. OneWire to DS18B20: Done
+   1. WiFi refactor: Done
+   1. MQTT: Done
+   1. Power saving deep sleep: Done
 1. Wiring diagram: Not started
-1. Case design: In progress
+1. Case design: Completed
 
 **TODO:**
 
 1. Implement CLI command completion hinting (see iperf example code)
+
+**Notes:**
+
+1. When you flash the firmware, the config is retained, as it is stored in a
+   different flash partition.
+1. I originally implemented this using 9 bit DS18B20 resolution, but the 0.5 C
+   resolution was lacking. After profiling where we were spending our time, the
+   overwhelming majority of it was spent waiting to bring ip WiFi, get an IP,
+   etc. Therefore, it cost us very little in terms of power to kick off a full
+   resolution (12 bit) conversion, giving us 0.0625C resolution.
+
+**Known bugs:**
+
+1. If you save the config at the wrong time, it can try to take down WiFi when
+   it is already being brought down so the unit can go to sleep. This causes an
+   ESP_ERROR_CHECK to fail (because you can't bring down something that's
+   already being brought down), causing a panic reboot. Eventually, I'll get
+   around to modifying it so as to check for that specific error condition and
+   ignore it. Note that, when this happens, the config is saved before it
+   reboots, so it's not like you lose anything. Further, this is not likely to
+   occur outside of initial setup - hence why I haven't bothered to
+   fix it.
 
 #### BOM
 
@@ -66,7 +90,27 @@ You will need one of each of these items for each "puck".
    * I used the genuine article here, because I tried a couple of knockoffs and
     they lacked the ability to save configuration and were less precise than the
     actual Maxim product.
+      * The above is accurate, but if you run it at 12 bit resolution (the
+        default), it doesn't matter, and a generic knockoff will probably work
+        fine. Your mileage may vary. See `sensors/main/temperature.c` and set
+        `SENSOR_CONFIG_REG_VALUE` and `MEASUREMENT_DELAY_MS` accordingly.
    * https://www.mouser.com/ProductDetail/?qs=7H2Jq%252ByxpJKpIDCbiq4lfg%3D%3D
+
+#### Enclosure
+
+The enclosure is meant to be 3D printed. See the `enclosures` subdirectory. The
+files are all generated from a single SCAD file. If you want to re-render or
+modify them, feel free to do so. OpenSCAD is what I use.
+
+However, this is not strictly necessary, because I've already exported the 3
+pieces as `.stl`s. They are meant to print flat, without supports, in the
+orientation in which they are presented, on an FDM printer. They should print
+fine in any common 3D printing material. PLA will probably work fine, given the
+limited environmental effects to which they will be exposed. I used PETG, my
+rationale being that it should survive the temperature fluctuations and UV
+exposure a little better than PLA, but mainly because I wanted an excuse to get
+PETG printing dialed in on my printer - it's still pretty stringy, but vastly
+improved versus the beginning of the project.
 
 ### Base station
 
@@ -121,13 +165,12 @@ Example links are provided for clarity, in cases where the hardware is uncommon.
          current draw for a commonly used electromechanical relay was 70mA,
          wheras it was 10mA for the SSR (though in both cases, actual measured
          current draw in situ was about an order of magnitude less).
-   * Note that there is a bit of a cheat here - I assume that only one
-     contact will be closed at any given time per zone - that is, only one of
-     fan, heat, or cool. If this is not true, and you have enough zones, you can
-     exceed the overall current rating for the board. For example, if we turn on
-     fan and heat for 3 zones at the stated 10mA power consumption, we will end
-     up at 60mA, which is more than the allowed aggregate across all GPIO
-     contacts.
+   * Note that there is a bit of a cheat here - I assume that only one contact
+     will be closed at any given time per zone - that is, only one of fan, heat,
+     or cool. If this is not true, and you have enough zones, you can exceed the
+     overall current rating for the board. For example, if we turn on fan and
+     heat for 3 zones at the stated 10mA power consumption, we will end up at
+     60mA, which is more than the allowed aggregate across all GPIO contacts.
   * 24VAC to 5V buck converter
     * I used
       https://www.amazon.com/SMAKN%C2%AE-Converter-Voltage-Supply-Waterproof/dp/B00RE6QN4U
@@ -150,7 +193,9 @@ funeral.
 
 ### SSL
 
-The default firmware does not do CA certificate verification on the cert
+#### Sensor
+
+The default sensor firmware does not do CA certificate verification on the cert
 presented by the MQTT server. This is because the common case for this
 application is nodes in one's house talking to a controller via a private
 network with an internal, private DNS. As a result, it is most likely that a
@@ -167,6 +212,11 @@ presented here - especially when one takes into account using a secured WiFi
 network. We're at 2 levels of encryption and credentials, and I'm not going lose
 any sleep over the fact that the second layer of encryption is not as strong as
 it could be.
+
+#### NodeRED / Webserver
+
+This is just using the default selfsigned cert that's generated when Apache is
+installed. 
 
 ## License
 
