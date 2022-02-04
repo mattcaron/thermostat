@@ -20,9 +20,43 @@ static const char *TAG = "temperature";
 #define SENSOR_GPIO GPIO_NUM_12
 #define POWER_GPIO GPIO_NUM_13
 
-// From the datasheet, with R0 and R1 both 0, the 9 bit resolution takes
-// 93.75ms to do the conversion. This gives it slightly more time.
-#define MEASUREMENT_DELAY_MS 95
+/* For our config, we want to turn off the high 3 bits and leave the others
+ * alone. Note that, strictly speaking, the DS18B20 only cares about bits 5
+ * and 6 - bit 7 is always zero. But, some other sensors have that high bit
+ * and can use it for other resolutions. But, clearing it should result in the
+ * standard behavior and not bother the actual DS18B20.
+ */
+
+/* Values for the config register for various conversion precisions and
+ * conversion times in ms.
+ *
+ * Note that various third party sensors may use these bits for other purposes;
+ * if so, add them as necessary. This is only tested with the actual Dallas /
+ * Maxim DS18B20.
+ */
+#define DS18B20_12BIT 0x7F
+#define DS18B20_12BIT_TIME 750
+#define DS18B20_11BIT 0x5F
+#define DS18B20_11BIT_TIME 375
+#define DS18B20_10BIT 0x3F
+#define DS18B20_10BIT_TIME 188
+#define DS18B20_9BIT  0x1F
+#define DS18B20_9BIT_TIME 94
+
+/*
+ * Precision and delay selection. Note that we add one to the delay to ensure
+ * ample time.
+ */
+#define SENSOR_CONFIG_REG_VALUE DS18B20_12BIT
+#define MEASUREMENT_DELAY_MS DS18B20_12BIT_TIME + 1
+
+/*
+ * If we are running the DS18B20 in its default mode (12 bit resolution), we
+ * don't need to update the config because new parts will be set to the
+ * defaults. However, if not, this needs to be set to 1 so we update the config
+ * accordingly.
+ */
+#define CHECK_DS18B20_CONFIG 1
 
 // The last temperature we read.
 float last_temp = 0;
@@ -117,9 +151,10 @@ static bool read_temperature(float *temperature)
     return success;
 }
 
+#if CHECK_DS18B20_CONFIG
 /**
  * Check and (optionally) fix the configuration.
- *
+ * 
  * @return true the configuration was or is now correct.
  * @return false if there was any sort of error.
  */
@@ -139,20 +174,13 @@ static bool check_and_fix_18b20_configuration(void)
                  esp_err_to_name(ret));
     }
     else {
-        /* The config register is byte index 4, and we want to turn off the
-         * high 3 bits and leave the others alone.
-         * Note that, strictly speaking, the DS18B20 only cares about bits 5
-         * and 6 - bit 7 is always zero. But, some other sensors have that
-         * high bit and can use it for other resolutions. But, clearing it
-         * should result in the standard behavior and not bother the actual
-         * DS18B20.
-         */
-        if ((scratchpad[4] & 0xE0) == 0) {
+        // The config register is byte index 4
+        if (scratchpad[4] == SENSOR_CONFIG_REG_VALUE) {
             ESP_LOGI(TAG, "Temperature sensor config is correct.");
             success = true;
         }
         else {
-            scratchpad[4] = scratchpad[4] & 0x1F;
+            scratchpad[4] = SENSOR_CONFIG_REG_VALUE;
 
             ESP_LOGI(TAG,
                      "Temperature sensor config is incorrect - rewriting.");
@@ -183,6 +211,7 @@ static bool check_and_fix_18b20_configuration(void)
 
     return success;
 }
+#endif // CHECK_DS18B20_CONFIG
 
 float c_to_f(float celsius)
 {
@@ -204,6 +233,7 @@ static void temp_task(void *pvParameters)
 
     float temp_temp;
 
+#if CHECK_DS18B20_CONFIG
     // Check and fix our sensor config.
     comms_success = false;
     retries = 5;
@@ -211,6 +241,7 @@ static void temp_task(void *pvParameters)
         comms_success = check_and_fix_18b20_configuration();
         --retries;
     }
+#endif // CHECK_DS18B20_CONFIG
 
     while (true) {
         comms_success = false;
