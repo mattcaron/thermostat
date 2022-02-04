@@ -45,3 +45,107 @@ Assuming one is starting with a Raspberry Pi 3 or similar...
        1. Generate certs/keys/chain files/etc. via your favorite method.
        2. Put them in `/etc/mosquitto/certs`
        3. Make sure that they are owned:growned by `mosquitto:mosquitto`.
+       4. And that they're group readable:
+
+              sudo chmod g+r /etc/mosquitto/certs/* 
+
+       5. At that the user `pi` is in the `mosquitto` group so NodeRed (which
+          runs as `pi`) can read them.
+
+              sudo usermod -a -G mosquitto pi
+
+6. Set up NodeRED / Apache / etc.
+
+   1. Install necessary dependencies:
+
+          sudo apt install nodered apache2 libapache2-mod-authnz-external
+
+   2. Generate a PEM cert/key pair via your favorite method and put them in a
+      useful place. The config below assumes they will be in `/etc/ssl/private`
+      and be called `apache.pem` and `apache.key`.
+
+   3. Create a config file akin to the following in
+      `/etc/apache2/sites-available/thermostat.conf`. Make sure to replace
+      things for your server, email, etc. as appropriate.
+
+          <VirtualHost _default_:80>
+              ServerName thermostat
+              ServerAdmin user@domain.com
+
+              Redirect /  https://thermostat/
+          </VirtualHost>
+
+          <VirtualHost _default_:443>
+              ServerName stairs
+              ServerAdmin matt@mattcaron.net
+
+              SSLEngine on
+              SSLCertificateFile    /etc/ssl/private/apache.pem
+              SSLCertificateKeyFile /etc/ssl/private/apache.key
+
+              # Standard SSL protocol adustments for IE
+              BrowserMatch "MSIE [2-6]" \
+                           nokeepalive ssl-unclean-shutdown \
+                           downgrade-1.0 force-response-1.0
+              BrowserMatch "MSIE [17-9]" ssl-unclean-shutdown
+
+              AddExternalAuth pwauth /usr/sbin/pwauth
+              SetExternalAuthMethod pwauth pipe
+
+              <Location "/nodered">
+                  AuthType Basic
+                  AuthName "Login"
+                  AuthBasicProvider external
+                  AuthExternal pwauth
+                  Require valid-user
+              </Location>
+
+              SSLProxyEngine On
+              ProxyPreserveHost On
+              ProxyRequests Off
+
+              ProxyPass /nodered/comms  ws://localhost:1880/nodered/comms
+
+              ProxyPass /nodered/comms http://localhost:1880/nodered/comms
+              ProxyPassReverse /nodered/comms http://localhost:1880/nodered/comms
+
+              ProxyPass /nodered http://localhost:1880/nodered
+              ProxyPassReverse /nodered http://localhost:1880/nodered
+
+              ProxyPass /editor http://localhost:1880/nodered
+              ProxyPassReverse /editor http://localhost:1880/nodered
+
+              ProxyPass / http://localhost:1880/nodered/ui/
+              ProxyPassReverse / http://localhost:1880/nodered/ui/
+
+          </VirtualHost>
+
+   4. Edit the NodeRed config file (`/home/pi/.node-red/settings.js`), and make
+      the following changes:
+
+      1. Uncomment the `uiHost: "127.0.0.1",` so it only listens on localhost
+         (the rest is handled by the Apache proxy, above).
+
+      2. Set `httpRoot: '/nodered',`
+
+   5. Enable the site above, disable the default one, and reload the config.
+
+          sudo service nodered start
+          sudo a2enmod ssl authnz_external proxy proxy_http proxy_wstunnel
+          sudo a2ensite thermostat
+          sudo a2dissite 000-default
+          sudo service apache2 restart
+
+   6. (Optional) Add some useful NodeRed things.
+
+       **NOTE:** Do all these in the `~/pi/.node-red` directory
+
+      1. UI Components:
+
+             npm install node-red-dashboard
+             npm install node-red-contrib-flogger
+
+
+       Once that's all done, you'll need to restart nodered:
+
+          sudo service nodered restart
