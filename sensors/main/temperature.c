@@ -219,7 +219,7 @@ float c_to_f(float celsius)
 }
 
 /**
- * Temperatue polling task.
+ * Temperature polling task.
  *
  * @param pvParameters Parameters for the function (unused)
  */
