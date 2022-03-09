@@ -150,3 +150,45 @@ Assuming one is starting with a Raspberry Pi 3 or similar...
    1. Once that's all done, you'll need to restart nodered:
 
           sudo service nodered restart
+
+   1. And make sure it starts on boot
+
+          sudo systemctl enable nodered
+
+   1. Allow for local temp sensing
+
+      1. Add the following to `/etc/rc.local` (before the `exit`), making sure
+         to set the `gpiopin` to whatever GPIO you attached any local sensors.
+         Note that multiple devices can be created by repeating this command:
+
+             dtoverlay w1-gpio gpiopin=14 pullup=0
+
+      1. The device will be something like `/sys/bus/w1/devices/28-012062f7a914`
+         - you'll need to look around and find it, each has a different ID.
+
+      1. Add bc to make it easier to do math from the CLI
+
+             sudo apt install bc
+
+      1. And this shell script will read it out and print it on STDOUT so we can
+         read it in to NodeRED. Make sure to change the `cat` command to the
+         device attached to your system.
+
+             #!/bin/sh
+
+             temp_c=`cat /sys/bus/w1/devices/28-012062f7a914/temperature`
+             echo "scale=1; $temp_c/1000*1.8 + 32" | bc
+
+1. Make sure to give it either a static IP or a static DHCP lease and add that
+   IP to your local network DNS lookup. The reason here is that the sensors need
+   to be able to get to it to submit their temperature information. If they are
+   using static IPs, they will connect to that IP, so it better not change. If
+   you have it use a hostname, it will do a DNS lookup, and that could change,
+   but if you reboot the router, then it may not end up resolving until the next
+   time the controller renews its lease (unless you go reboot it). In that
+   scenario, you run the risk of the sensors not being able to connect to the
+   controller for however long the DHCP lease has remaining. If it's a static
+   lease and associated DNS entry, however, if will keep the old IP which will
+   be valid (because the DHCP server hands out the same IP every time) and the
+   hostname will resolve, because it's in a static lookup table rather than
+   being dynamically updated by DHCP registrations.
