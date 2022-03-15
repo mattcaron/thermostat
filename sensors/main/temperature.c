@@ -266,38 +266,51 @@ static void temp_task(void *pvParameters)
 
         ESP_LOGI(TAG, "Waiting for MQTT subscription.");
         // Wait for mqtt to be subscribed before attempting to send our message
-        wait_for_mqtt_subscribed();
+        if (wait_for_mqtt_subscribed()) {
 
-        if (comms_success) {
-            // good temp, update
-            if (current_config.use_celsius) {
-                last_temp = temp_temp;
-                ESP_LOGW(TAG, "Read temp: %.1f°C", last_temp);
+            if (comms_success) {
+                // good temp, update
+                if (current_config.use_celsius) {
+                    last_temp = temp_temp;
+                    ESP_LOGW(TAG, "Read temp: %.1f°C", last_temp);
+                }
+                else {
+                    last_temp = c_to_f(temp_temp);
+                    ESP_LOGW(TAG, "Read temp: %.1f°F", last_temp);
+                }
+
+                // We've read our temperature, wake up our WiFi task to send it.
+                wifi_send_mqtt_temperature();
             }
             else {
-                last_temp = c_to_f(temp_temp);
-                ESP_LOGW(TAG, "Read temp: %.1f°F", last_temp);
+                ESP_LOGE(TAG, "Temperature read invalid - not doing anything.");
             }
 
-            // We've read our temperature, wake up our WiFi task to send it.
-            wifi_send_mqtt_temperature();
+            ESP_LOGI(TAG, "Waiting for MQTT queue to be empty.");
+            // While there are any MQTT messages outstanding, sleep for 10ms
+            // until they are sent.
+            if (wait_for_mqtt_queue_empty()) {
+
+                // Once the queue is empty, we can disable WiFi.
+
+                ESP_LOGI(TAG, "Waiting for WiFi off.");
+                // we're about to go sleep; disable wifi so it comes down
+                // gracefully, and then wait for it to actually be down.
+                wifi_disable();
+
+                if (!wait_for_wifi_off()) {
+                    ESP_LOGW(TAG,
+                         "Timeout waiting for wifi to come down, sleeping.");
+                }
+            }
+            else {
+                ESP_LOGW(TAG,
+                         "Timeout waiting for MQTT message to send, sleeping.");
+            }
         }
         else {
-            ESP_LOGE(TAG, "Temperature read invalid - not doing anything.");
+            ESP_LOGW(TAG, "Timeout waiting to subscribe to MQTT, sleeping.");
         }
-
-        ESP_LOGI(TAG, "Waiting for MQTT queue to be empty.");
-        // While there are any MQTT messages outstanding, sleep for 10ms until
-        // they are sent.
-        wait_for_mqtt_queue_empty();
-
-        // Once the queue is empty, we can disable WiFi.
-
-        ESP_LOGI(TAG, "Waiting for WiFi off.");
-        // we're about to go sleep; disable wifi so it comes down gracefully,
-        // and then wait for it to actually be down.
-        wifi_disable();
-        wait_for_wifi_off();
 
         // and we need to account for the time we spent executing, above.
         now = xTaskGetTickCount();

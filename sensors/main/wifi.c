@@ -542,30 +542,65 @@ void emit_mqtt_status(void)
     }
 }
 
-void wait_for_mqtt_subscribed(void)
+bool wait_for_mqtt_subscribed(void)
 {
-    xEventGroupWaitBits(wifi_mqtt_status,
-                        MQTT_SUBSCRIBED,
-                        pdFALSE,
-                        pdFALSE,
-                        portMAX_DELAY);
+    EventBits_t bits;
 
+    bits = xEventGroupWaitBits(
+            wifi_mqtt_status,
+            MQTT_SUBSCRIBED,
+            pdFALSE,
+            pdFALSE,
+            MQTT_CONNECT_WAIT_TIMEOUT_S * 1000 / portTICK_PERIOD_MS);
+
+    if (bits & MQTT_SUBSCRIBED) {
+        // bit set
+        return true;
+    }
+    else {
+        // timeout
+        return false;
+    }
 }
 
-void wait_for_mqtt_queue_empty(void)
+bool wait_for_mqtt_queue_empty(void)
 {
-    xEventGroupWaitBits(wifi_mqtt_status,
-                        MQTT_QUEUE_EMPTY,
-                        pdFALSE,
-                        pdFALSE,
-                        portMAX_DELAY);
+    EventBits_t bits;
+
+    bits = xEventGroupWaitBits(
+            wifi_mqtt_status,
+            MQTT_QUEUE_EMPTY,
+            pdFALSE,
+            pdFALSE,
+            MQTT_SEND_WAIT_TIMEOUT_S * 1000 / portTICK_PERIOD_MS);
+
+    if (bits & MQTT_QUEUE_EMPTY) {
+        // bit set
+        return true;
+    }
+    else {
+        // timeout
+        return false;
+    }
 }
 
-void wait_for_wifi_off(void)
+bool wait_for_wifi_off(void)
 {
-    xEventGroupWaitBits(wifi_mqtt_status,
-                        WIFI_OFF,
-                        pdFALSE,
-                        pdFALSE,
-                        portMAX_DELAY);
+    EventBits_t bits;
+
+    bits = xEventGroupWaitBits(
+            wifi_mqtt_status,
+            WIFI_OFF,
+            pdFALSE,
+            pdFALSE,
+            WIFI_DOWN_WAIT_TIMEOUT_S * 1000 / portTICK_PERIOD_MS);
+
+    if (bits & WIFI_OFF) {
+        // bit set
+        return true;
+    }
+    else {
+        // timeout
+        return false;
+    }
 }
