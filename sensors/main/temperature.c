@@ -164,47 +164,51 @@ static bool check_and_fix_18b20_configuration(void)
     uint8_t scratchpad[8] = {};
 
     bool success = false;
+    int count = 0;
     esp_err_t ret;
 
     sensor_on();
 
-    ret = ds18x20_read_scratchpad(SENSOR_GPIO, DS18X20_ANY, scratchpad);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Error reading scratchpad: %s",
-                 esp_err_to_name(ret));
-    }
-    else {
-        // The config register is byte index 4
-        if (scratchpad[4] == SENSOR_CONFIG_REG_VALUE) {
-            ESP_LOGI(TAG, "Temperature sensor config is correct.");
-            success = true;
+    while (!success && count < 5 ) {
+        ret = ds18x20_read_scratchpad(SENSOR_GPIO, DS18X20_ANY, scratchpad);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Error reading scratchpad: %s",
+                    esp_err_to_name(ret));
         }
         else {
-            scratchpad[4] = SENSOR_CONFIG_REG_VALUE;
-
-            ESP_LOGI(TAG,
-                     "Temperature sensor config is incorrect - rewriting.");
-
-            // We only write bytes 2-4, to the scratchpad.
-            ret = ds18x20_write_scratchpad(SENSOR_GPIO,
-                                           DS18X20_ANY,
-                                           &scratchpad[2]);
-            if (ret != ESP_OK) {
-                ESP_LOGE(TAG, "Error writing scratchpad: %s",
-                         esp_err_to_name(ret));
+            // The config register is byte index 4
+            if (scratchpad[4] == SENSOR_CONFIG_REG_VALUE) {
+                ESP_LOGI(TAG, "Temperature sensor config is correct.");
+                success = true;
             }
             else {
-                // And then save it once it's written.
-                ret = ds18x20_copy_scratchpad(SENSOR_GPIO, DS18X20_ANY);
+                scratchpad[4] = SENSOR_CONFIG_REG_VALUE;
+
+                ESP_LOGI(TAG,
+                        "Temperature sensor config is incorrect - rewriting.");
+
+                // We only write bytes 2-4, to the scratchpad.
+                ret = ds18x20_write_scratchpad(SENSOR_GPIO,
+                                            DS18X20_ANY,
+                                            &scratchpad[2]);
                 if (ret != ESP_OK) {
-                    ESP_LOGE(TAG, "Error copying scratchpad: %s",
-                             esp_err_to_name(ret));
+                    ESP_LOGE(TAG, "Error writing scratchpad: %s",
+                            esp_err_to_name(ret));
                 }
                 else {
-                    success = true;
+                    // And then save it once it's written.
+                    ret = ds18x20_copy_scratchpad(SENSOR_GPIO, DS18X20_ANY);
+                    if (ret != ESP_OK) {
+                        ESP_LOGE(TAG, "Error copying scratchpad: %s",
+                                esp_err_to_name(ret));
+                    }
+                    else {
+                        success = true;
+                    }
                 }
             }
         }
+        ++count;
     }
 
     sensor_off();
@@ -235,12 +239,7 @@ static void temp_task(void *pvParameters)
 
 #if CHECK_DS18B20_CONFIG
     // Check and fix our sensor config.
-    comms_success = false;
-    retries = 5;
-    while (!comms_success && retries > 0 ) {
-        comms_success = check_and_fix_18b20_configuration();
-        --retries;
-    }
+    comms_success = check_and_fix_18b20_configuration();
 #endif // CHECK_DS18B20_CONFIG
 
     while (true) {
