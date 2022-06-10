@@ -72,7 +72,11 @@ Assuming one is starting with a Raspberry Pi 3 or similar...
               ServerName thermostat
               ServerAdmin user@domain.com
 
-              Redirect /  https://thermostat/
+              Redirect /nodered  https://thermostat/nodered
+              Redirect /editor  https://thermostat/editor
+
+              ProxyPass / http://localhost:1880/nodered/ui/
+              ProxyPassReverse / http://localhost:1880/nodered/ui/
           </VirtualHost>
 
           <VirtualHost _default_:443>
