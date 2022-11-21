@@ -2,10 +2,18 @@
 
 Assuming one is starting with a Raspberry Pi 3 or similar...
 
-1. Install Raspberry Pi OS on the SD card via your favorite method and boot up
-   the system.
+1. Install Raspberry Pi OS Lite on the SD card via your favorite
+   method and boot up the system.
 
-1. Make accounts and apply updates as normal:
+1. Make a user. From here on out, the docs will assume your user is `alice`.
+   Replace as appropriate.
+
+    * **Note:** In earlier Rasberry Pi OS builds, there was a default `pi` user
+      which some software (such as Node Red) assumed would be there. In Bullseye
+      and later, this seems to be the user created above, but this may not
+      always be true. See <https://www.raspberrypi.com/news/raspberry-pi-bullseye-update-april-2022/>.
+
+1. Apply updates as normal:
 
        sudo apt update
        sudo apt dist-upgrade
@@ -39,6 +47,7 @@ Assuming one is starting with a Raspberry Pi 3 or similar...
            cafile /etc/mosquitto/certs/ca.crt
            certfile /etc/mosquitto/certs/crt              
            keyfile /etc/mosquitto/certs/key 
+           password_file /etc/mosquitto/passwd
 
     1. Set up certs
 
@@ -49,10 +58,10 @@ Assuming one is starting with a Raspberry Pi 3 or similar...
 
               sudo chmod g+r /etc/mosquitto/certs/* 
 
-       1. At that the user `pi` is in the `mosquitto` group so NodeRed (which
-          runs as `pi`) can read them.
+       1. At that the user `alice` is in the `mosquitto` group so NodeRed (which
+          runs as `alice`) can read them.
 
-              sudo usermod -a -G mosquitto pi
+              sudo usermod -a -G mosquitto alice
 
 1. Set up NodeRED / Apache / etc.
 
@@ -124,7 +133,7 @@ Assuming one is starting with a Raspberry Pi 3 or similar...
 
           </VirtualHost>
 
-   1. Edit the NodeRed config file (`/home/pi/.node-red/settings.js`), and make
+   1. Edit the NodeRed config file (`/home/alice/.node-red/settings.js`), and make
       the following changes:
 
       1. Uncomment the `uiHost: "127.0.0.1",` so it only listens on localhost
@@ -142,14 +151,13 @@ Assuming one is starting with a Raspberry Pi 3 or similar...
 
    1. (Optional) Add some useful NodeRed things.
 
-       **NOTE:** Do all these in the `~/pi/.node-red` directory
+       **NOTE:** Do all these in the `~alice/.node-red` directory
 
       1. Add UI Components:
 
              npm install node-red-dashboard
              npm install node-red-contrib-flogger
              npm install node-red-node-email
-
 
    1. Once that's all done, you'll need to restart nodered:
 
