@@ -1,17 +1,21 @@
 /**
  * @file
  * WiFi code.
- *
- * Okay, that's a lie. It does MQTT too....
+ * 
+ * Okay, that's a lie. It does COAP too....
  *
  * Derived from ESP8266_RTOS_SDK example
  * examples/wifi/getting_started/station/main/station_example_main.c, which is
  * licensed as Public Domain.
  *
  * Also derived from ESP8266_RTOS_SDK example
- * examples/protocols/mqtt/ssl/main/app_main.c, which is also licensed as
- * Public Domain.
+ * examples/protocols/coap_client/main/coap_client_example_main.c, which is
+ * also licensed as Public Domain.
  */
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -26,10 +30,11 @@
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "queues.h"
-#include "mqtt_client.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
+
+#include "coap/coap.h"
 
 #include "priorities.h"
 #include "wifi.h"
@@ -37,7 +42,7 @@
 #include "temperature.h"
 
 /* FreeRTOS event group to signal when we are connected*/
-static EventGroupHandle_t wifi_mqtt_status;
+static EventGroupHandle_t wifi_status;
 
 /** Definition bits for the above status. */
 #define WIFI_OFF           BIT0 /**< WiFi is off. */
@@ -45,123 +50,20 @@ static EventGroupHandle_t wifi_mqtt_status;
 #define WIFI_STARTED       BIT2 /**< WiFi has been started. */
 #define WIFI_CONNECTED     BIT3 /**< WiFi has connected to the AP. */
 #define WIFI_FAIL          BIT4 /**< WiFi has failed to connect to the AP. */
-#define MQTT_STARTED       BIT5 /**< MQTT has been started. */
-#define MQTT_CONNECTED     BIT6 /**< MQTT has connected to the MQTT server. */
-#define MQTT_SUBSCRIBED    BIT7 /**< MQTT has subscribed to the topic. */
-#define MQTT_QUEUE_EMPTY   BIT8 /**< MQTT has a no messages in flight. */
+#define COAP_QUEUE_EMPTY   BIT5 /**< Whether there are no COAP messages being sent. */
+#define COAP_SUCCESSFUL    BIT6 /**< Whether the last CoAP message was successful or not. */
 
 #define WIFI_MAXIMUM_RETRIES 3  /**< Maximum connection retries. */
 
+#define COAP_TIMEOUT_S 5        /**< Maximum time to wait for a successful
+                                     reply from the CoAP server. */
+
 static const char *TAG = "WiFi";
 
-static int s_retry_num = 0;
-
-esp_mqtt_client_handle_t mqtt_client = NULL;
-
-static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
-                               int32_t event_id, void *event_data)
-{
-    esp_mqtt_event_handle_t event = event_data;
-
-    esp_mqtt_client_handle_t client = event->client;
-
-    int msg_id;
-
-    switch (event->event_id) {
-        case MQTT_EVENT_CONNECTED:
-            ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
-            xEventGroupSetBits(wifi_mqtt_status, MQTT_CONNECTED);
-            msg_id = esp_mqtt_client_subscribe(client,
-                                               current_config.mqtt_topic,
-                                               1);
-            ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
-            break;
-
-        case MQTT_EVENT_DISCONNECTED:
-            ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
-            xEventGroupClearBits(wifi_mqtt_status, MQTT_CONNECTED);
-            break;
-
-        case MQTT_EVENT_SUBSCRIBED:
-            ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
-            xEventGroupSetBits(wifi_mqtt_status, MQTT_SUBSCRIBED);
-            break;
-
-        case MQTT_EVENT_UNSUBSCRIBED:
-            ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
-            xEventGroupClearBits(wifi_mqtt_status, MQTT_SUBSCRIBED);
-            break;
-
-        case MQTT_EVENT_PUBLISHED:
-            // This event, when used with QoS 1 or 2 (we are using 1), will be
-            // posted when the broker accepts the message handoff. Hence, it is
-            // pretty reliable (that's what QoS is for after all), and we can
-            // safely go to sleep once the count reaches 0.
-            ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
-            xEventGroupSetBits(wifi_mqtt_status, MQTT_QUEUE_EMPTY);
-            break;
-
-        case MQTT_EVENT_DATA:
-            ESP_LOGI(TAG, "MQTT_EVENT_DATA");
-            printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
-            printf("DATA=%.*s\r\n", event->data_len, event->data);
-            break;
-
-        case MQTT_EVENT_BEFORE_CONNECT:
-            ESP_LOGI(TAG, "MQTT_EVENT_BEFORE_CONNECT");
-            break;
-
-        case MQTT_EVENT_ERROR:
-            ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
-            if (event->error_handle->error_type == MQTT_ERROR_TYPE_ESP_TLS) {
-                ESP_LOGI(TAG, "Last error code reported from esp-tls: 0x%x",
-                         event->error_handle->esp_tls_last_esp_err);
-                ESP_LOGI(TAG, "Last tls stack error number: 0x%x",
-                         event->error_handle->esp_tls_stack_err);
-            }
-            else if (event->error_handle->error_type ==
-                     MQTT_ERROR_TYPE_CONNECTION_REFUSED) {
-                ESP_LOGI(TAG, "Connection refused error: 0x%x",
-                         event->error_handle->connect_return_code);
-            }
-            else {
-                ESP_LOGW(TAG, "Unknown error type: 0x%x", event->error_handle->error_type);
-            }
-            break;
-
-        default:
-            ESP_LOGI(TAG, "Other event id:%d", event->event_id);
-            break;
-    }
-}
-
 /**
- * Connect to our MQTT broker.
- *
- * @note Make sure we're connected to WiFi with an IP before calling this,
- * else it will fail.
+ * Counter for the number of wifi retries so far
  */
-static void mqtt_start(void)
-{
-    const esp_mqtt_client_config_t mqtt_cfg = {
-        .uri = current_config.mqtt_uri,
-        .client_id = current_config.station_name,
-        // Not setting .cert_pem implicitly disables certificate verification,
-        // which is what we actually want - since the common case for this
-        // application is to use a selfsigned cert inside a closed network - or
-        // even no encryption at all, which will happen if one uses an mqtt://
-        // URL instead of an mqtts:// URL.
-    };
-
-    mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
-    ESP_ERROR_CHECK(esp_mqtt_client_register_event(
-                        mqtt_client,
-                        ESP_EVENT_ANY_ID,
-                        mqtt_event_handler,
-                        mqtt_client));
-    ESP_ERROR_CHECK(esp_mqtt_client_start(mqtt_client));
-    xEventGroupSetBits(wifi_mqtt_status, MQTT_STARTED);
-}
+static int s_retry_num = 0;
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data)
@@ -175,12 +77,12 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
              event_id == WIFI_EVENT_STA_DISCONNECTED) {
 
         // We got disconnected, make sure connected bit is clear.
-        xEventGroupClearBits(wifi_mqtt_status,
+        xEventGroupClearBits(wifi_status,
                              WIFI_CONNECTED);
 
         // If we are in the process of stopping, or if WiFi is off, DO NOT try
         // to connect - doing so causes an error.
-        status = xEventGroupGetBits(wifi_mqtt_status);
+        status = xEventGroupGetBits(wifi_status);
         if (status & (WIFI_OFF | WIFI_STOPPING)) {
             ESP_LOGI(TAG, "WiFI is shutting down, not reconnecting.");
         }
@@ -192,7 +94,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
             }
             else {
                 // Give up on connecting so we don't spin here forever.
-                xEventGroupSetBits(wifi_mqtt_status, WIFI_FAIL);
+                xEventGroupSetBits(wifi_status, WIFI_FAIL);
             }
             ESP_LOGI(TAG,"connect to the AP fail");
         }
@@ -204,7 +106,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         // We've successfully connected, so reset our connection attempts
         // counter and set our connected bit.
         s_retry_num = 0;
-        xEventGroupSetBits(wifi_mqtt_status, WIFI_CONNECTED);
+        xEventGroupSetBits(wifi_status, WIFI_CONNECTED);
     }
 }
 
@@ -218,11 +120,11 @@ static void wifi_init(void)
 {
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
 
-    wifi_mqtt_status = xEventGroupCreate();
+    wifi_status = xEventGroupCreate();
 
     // Some bits are set for off/disabled/empty - set those now, because we
     // start with wifi stopped and the queue empty.
-    xEventGroupSetBits(wifi_mqtt_status, WIFI_OFF | MQTT_QUEUE_EMPTY);
+    xEventGroupSetBits(wifi_status, WIFI_OFF);
 
     ESP_ERROR_CHECK(esp_netif_init());
 
@@ -281,7 +183,7 @@ static void connect_wifi(void)
 {
     wifi_config_t wifi_config = {};
 
-    xEventGroupClearBits(wifi_mqtt_status, WIFI_OFF);
+    xEventGroupClearBits(wifi_status, WIFI_OFF);
 
     strncpy((char *)wifi_config.sta.ssid, current_config.ssid,
             sizeof(wifi_config.sta.ssid));
@@ -297,14 +199,14 @@ static void connect_wifi(void)
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
 
     ESP_ERROR_CHECK(esp_wifi_start());
-    xEventGroupSetBits(wifi_mqtt_status, WIFI_STARTED);
+    xEventGroupSetBits(wifi_status, WIFI_STARTED);
 
     ESP_LOGI(TAG, "WiFi config finished.");
 
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT)
      * or connection failed for the maximum number of re-tries (WIFI_FAIL_BIT). * The bits are set by wifi_event_handler() (see above). */
     EventBits_t status = xEventGroupWaitBits(
-                             wifi_mqtt_status,
+                             wifi_status,
                              WIFI_CONNECTED | WIFI_FAIL,
                              pdFALSE,
                              pdFALSE,
@@ -312,9 +214,7 @@ static void connect_wifi(void)
 
     if (status & WIFI_CONNECTED) {
         ESP_LOGI(TAG, "connected to SSID: %s", wifi_config.sta.ssid);
-
-        // We are now connected to WiFi, so do our MQTT connection stuff
-        mqtt_start();
+        // We are now connected to WiFi
     }
     else if (status & WIFI_FAIL) {
         ESP_LOGI(TAG, "Failed to connect to SSID: %s", wifi_config.sta.ssid);
@@ -331,39 +231,11 @@ static void connect_wifi(void)
  */
 static void disconnect_wifi(void)
 {
-    EventBits_t status = xEventGroupGetBits(wifi_mqtt_status);
+    EventBits_t status = xEventGroupGetBits(wifi_status);
     
     // signal that we are in the process of stopping WiFi and shouldn't try to 
     // reconnect, etc.
-    xEventGroupSetBits(wifi_mqtt_status, WIFI_STOPPING);
-
-    if (status & MQTT_SUBSCRIBED) {
-        // This doesn't return an esp_err_t, but rather a message id, with -1
-        // being an error, so we check for that instead.
-        if (esp_mqtt_client_unsubscribe(mqtt_client,
-                                        current_config.mqtt_topic) == -1) {
-            ESP_LOGE(TAG, "Error unsubscribing from MQTT topic");
-        }
-        else {
-            // Successfully unsubscribed, but this doesn't always generate an
-            // event, so clear it here as well.
-            xEventGroupClearBits(wifi_mqtt_status, MQTT_SUBSCRIBED);
-        }
-    }
-    if (status & MQTT_CONNECTED) {
-        ESP_ERROR_CHECK(esp_mqtt_client_disconnect(mqtt_client));
-        // Successfully disconnected, but this doesn't always generate an
-        // event, so clear it here as well.
-        xEventGroupClearBits(wifi_mqtt_status, MQTT_CONNECTED);
-    }
-    if (status & MQTT_STARTED) {
-        /* One would think that an esp_mqtt_client_stop would be necessary here,
-         * but having it generates a runtime log warning about it already being
-         * stopped.
-         */
-        ESP_ERROR_CHECK(esp_mqtt_client_destroy(mqtt_client));
-        xEventGroupClearBits(wifi_mqtt_status, MQTT_STARTED);
-    }
+    xEventGroupSetBits(wifi_status, WIFI_STOPPING);
 
     if (status & WIFI_CONNECTED) {
         ESP_ERROR_CHECK(esp_wifi_disconnect());
@@ -372,13 +244,195 @@ static void disconnect_wifi(void)
         ESP_ERROR_CHECK(esp_wifi_stop());
         // We don't deinit the WiFi, because it's not necessary - the config is
         // set in connect_wifi, right before esp_wifi_start.
-        xEventGroupClearBits(wifi_mqtt_status, WIFI_STARTED);
+        xEventGroupClearBits(wifi_status, WIFI_STARTED);
     }
 
     // WiFi is now off.
-    xEventGroupSetBits(wifi_mqtt_status, WIFI_OFF);
+    xEventGroupSetBits(wifi_status, WIFI_OFF);
     // Since it is off, we are no longer stopping.
-    xEventGroupClearBits(wifi_mqtt_status, WIFI_STOPPING);
+    xEventGroupClearBits(wifi_status, WIFI_STOPPING);
+}
+
+/**
+ * Handler to handle replies from the CoAP server.
+ * 
+ * @param ctx context
+ * @param session session
+ * @param sent PDU sent
+ * @param received PDU received
+ * @param id message id
+ */
+static void coap_message_handler(coap_context_t *ctx, coap_session_t *session,
+                                 coap_pdu_t *sent, coap_pdu_t *received,
+                                 const coap_tid_t id)
+{
+    int class = COAP_RESPONSE_CLASS(received->code);
+    // This doesn't actually get the code bits, it just returns the full code.
+    // int code = COAP_RESPONSE_CODE(received->code);
+    int code = received->code & 0x1F;
+
+    // success is 2.05 which (PUT).(CONTENT). Anything else is an error.
+    if (class == 2 && code == 5) {
+        xEventGroupSetBits(wifi_status, COAP_SUCCESSFUL);
+    }
+    else {
+        ESP_LOGE(TAG, "Received code %d.%02d back from the CoAP server.", class, code);
+    }
+
+    xEventGroupSetBits(wifi_status, COAP_QUEUE_EMPTY);
+}
+
+/**
+ * Parse the coap server URI in the config into a given coap_uri_t struct,
+ * applying some validity checks along the way.
+ *
+ * @param uri URI structure into which all the URI details should be placed.
+ * 
+ * @return true if the parsing was successful and the URI should work.
+ * @return false if the parsing was unsuccessful or the URI won't work.
+*/
+static bool parse_coap_server(coap_uri_t *uri)
+{
+    if (coap_split_uri((const uint8_t *)current_config.uri, strlen(current_config.uri), uri) != 0) {
+        ESP_LOGE(TAG, "CoAP server uri error");
+        return false;
+    }
+
+    if ((uri->scheme==COAP_URI_SCHEME_COAPS && !coap_dtls_is_supported()) ||
+        (uri->scheme==COAP_URI_SCHEME_COAPS_TCP && !coap_tls_is_supported())) {
+        ESP_LOGE(TAG, "CoAP server uri scheme error");
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Send the temperature via CoAP.
+ *
+ * @return true if the packet was successfully sent
+ * @return false if the packet was not successfully sent
+ */
+static bool coap_send_temperature(void)
+{
+    /* Temporary data buffer.
+     *
+     * This is of the format:
+     *
+     * <station name>: <temperature>
+     *
+     * Station name is MAX_STATION_NAME_LEN.
+     * 
+     * There's a colon and a space, which is +2.
+     *
+     * The temperature range is -55 to 125C (-67 to 257F), which is 3
+     * characters. We also have a decimal point and another place, for a total
+     * of 5 characters, and then a NUL, for 6, total. */
+    char buffer[MAX_STATION_NAME_LEN + 2 + 6];
+
+    coap_uri_t uri;
+    char hostname[MAX_URI_LEN + 1];
+    struct addrinfo *ainfo;
+    coap_address_t dst_addr;
+    coap_context_t *ctx = NULL;
+    coap_session_t *session = NULL;
+    coap_pdu_t *request = NULL;
+    bool success = false;
+    int result;
+
+    if (!parse_coap_server(&uri)) {
+        ESP_LOGE(TAG, "parse_coap_server failed");
+    }
+    else {
+        // format our temperature
+        memset(buffer, 0, sizeof(buffer));
+        snprintf(buffer, sizeof(buffer), "%s: %.1f", current_config.station_name, get_last_temp());
+        
+        // This copy is necessary because the uri.host.s element is just a
+        // pointer into to the URI array - not a NUL terminated string. We
+        // don't want to change it, but getaddrinfo needs a NUL terminated
+        // hostname / IP. So, copy it out and NUL terminate it so
+        // getaddrinfo is content.
+        memcpy(hostname, uri.host.s, uri.host.length);
+        hostname[uri.host.length] = '\0';
+
+        result = getaddrinfo(hostname, NULL, NULL, &ainfo);
+        if (result != 0) {
+            ESP_LOGE(TAG, "getaddrinfo failed: %d", result);
+        }
+        else {
+            ctx = coap_new_context(NULL);
+            if (!ctx) {
+                ESP_LOGE(TAG, "coap_new_context() failed");
+            } else {
+                coap_address_init(&dst_addr);
+                dst_addr.size = ainfo->ai_addrlen;
+                memcpy(&dst_addr.addr, ainfo->ai_addr, ainfo->ai_addrlen);
+                if (ainfo->ai_family == AF_INET6) {
+                    dst_addr.addr.sin6.sin6_family = AF_INET6;
+                    dst_addr.addr.sin6.sin6_port   = htons(uri.port);
+                } else {
+                    dst_addr.addr.sin.sin_family   = AF_INET;
+                    dst_addr.addr.sin.sin_port     = htons(uri.port);
+                }
+
+                session = coap_new_client_session(ctx, NULL, &dst_addr,
+                    uri.scheme==COAP_URI_SCHEME_COAP_TCP ? COAP_PROTO_TCP :
+                    uri.scheme==COAP_URI_SCHEME_COAPS_TCP ? COAP_PROTO_TLS :
+                    uri.scheme==COAP_URI_SCHEME_COAPS ? COAP_PROTO_DTLS : COAP_PROTO_UDP);
+                if (!session) {
+                    ESP_LOGE(TAG, "coap_new_client_session() failed");
+                }
+                else {
+                    coap_register_response_handler(ctx, coap_message_handler);
+
+                    request = coap_new_pdu(session);
+                    if (!request) {
+                        ESP_LOGE(TAG, "coap_new_pdu() failed");
+                    }
+                    else {
+                        request->type = COAP_MESSAGE_CON;
+                        request->tid = coap_new_message_id(session);
+                        request->code = COAP_REQUEST_PUT;
+
+                        coap_add_option(request, COAP_OPTION_URI_PATH,
+                                        uri.path.length, uri.path.s);
+                        
+                        coap_add_data(request, strlen(buffer), (uint8_t *)buffer);
+
+                        xEventGroupClearBits(wifi_status, COAP_SUCCESSFUL|COAP_QUEUE_EMPTY);
+
+                        // coap_send deletes the request when finished
+                        coap_send(session, request);
+
+                        // this runs the coap network I/O; return value is how
+                        // long it took, or -1 if error.
+                        result = coap_run_once(ctx, COAP_TIMEOUT_S * 1000);
+                        if (result < 0) {
+                            ESP_LOGE(TAG, "coap_run_once returned %d", result);
+                        }
+                        else {
+                            ESP_LOGI(TAG, "sending the COAP message took %d ms", result);
+                        }
+
+                        // success is only true if we got a successful return
+                        // code
+                        if (xEventGroupGetBits(wifi_status) & COAP_SUCCESSFUL) {
+                            success = true;
+                        }
+                    }
+
+                    coap_session_release(session);
+                }
+                coap_free_context(ctx);            
+            }
+        }
+
+        coap_cleanup();
+        freeaddrinfo(ainfo);
+    }
+    
+    return success;
 }
 
 /**
@@ -392,11 +446,6 @@ static void disconnect_wifi(void)
 static void wifi_task(void *pvParameters)
 {
     uint8_t message;
-    /* temporary temperature buffer. The range is -55 to 125C (-67 to 257F),
-     * which is 3 characters. We also have a decimal point and another place, for a total of 5 characters, and then a NUL, for 6, total. */
-    char buffer[6];
-    int mqtt_msg_id;
-
     EventBits_t status;
 
     // basic wifi init (without configuration)
@@ -407,7 +456,7 @@ static void wifi_task(void *pvParameters)
             switch(message) {
                 case WIFI_START:
                     // TODO: Add some blinkenlights feedback here?
-                    status = xEventGroupGetBits(wifi_mqtt_status);
+                    status = xEventGroupGetBits(wifi_status);
                     if (status & WIFI_CONNECTED) {
                         ESP_LOGI(TAG,
                                  "WiFi already connected, discarding "
@@ -430,30 +479,13 @@ static void wifi_task(void *pvParameters)
                     // function checks extensively to not double-free something.
                     disconnect_wifi();
                     break;
-                case WIFI_SEND_MQTT:
-                    status = xEventGroupGetBits(wifi_mqtt_status);
-                    if (status & MQTT_SUBSCRIBED) {
-                        memset(buffer, 0, sizeof(buffer));
-                        sprintf(buffer, "%.1f", get_last_temp());
-                        mqtt_msg_id = esp_mqtt_client_publish(
-                                          mqtt_client,
-                                          current_config.mqtt_topic,
-                                          buffer,
-                                          strlen(buffer),
-                                          1,
-                                          false);
-                        if (mqtt_msg_id >= 0) {
-                            ESP_LOGI(TAG, "mqtt publish successful, msg_id=%d",
-                                     mqtt_msg_id);
-                        }
-                        else {
-                            ESP_LOGE(TAG, "mqtt publish unsuccessful");
-                        }
+                case WIFI_SEND_TEMP:
+                    status = xEventGroupGetBits(wifi_status);
+                    if (coap_send_temperature()) {
+                        ESP_LOGI(TAG, "Temperature sent successfully");
                     }
                     else {
-                        ESP_LOGI(TAG,
-                                 "MQTT not subscribed, "
-                                 "not publishing message.");
+                        ESP_LOGE(TAG, "Temperature sending failed");
                     }
                     break;
                 default:
@@ -494,87 +526,32 @@ void wifi_restart(void)
 }
 
 /**
- * Send last temperature reading over MQTT.
+ * Send last temperature reading.
  */
-void wifi_send_mqtt_temperature(void)
+void wifi_send_temperature(void)
 {
-    uint8_t message = WIFI_SEND_MQTT;
-
-    // We are going to queue up and send a message, so clear this status bit
-    // until we've done so.
-    xEventGroupClearBits(wifi_mqtt_status, MQTT_QUEUE_EMPTY);
+    uint8_t message = WIFI_SEND_TEMP;
 
     xQueueSend(wifi_queue, &message, portMAX_DELAY);
 }
 
 void start_wifi(void)
 {
-    xTaskCreate(wifi_task, "wifi", 3072, NULL, WIFI_TASK_PRIORITY, NULL);
+    xTaskCreate(wifi_task, "wifi", 5 * 1024, NULL, WIFI_TASK_PRIORITY, NULL);
 }
 
-void emit_mqtt_status(void)
-{
-    EventBits_t status = xEventGroupGetBits(wifi_mqtt_status);
-
-    printf("MQTT information:\n");
-    if (!(status & MQTT_STARTED)) {
-        printf("\tStarted: No\n");
-    }
-    else {
-        printf("\tStarted: No\n");
-        printf("\tURI:\t%s\n", current_config.mqtt_uri);
-        printf("\tConnected:\t");
-        if (status & MQTT_CONNECTED) {
-            printf("Yes\n");
-        }
-        else {
-            printf("No\n");
-        }
-
-        printf("\tTopic:\t%s\n", current_config.mqtt_topic);
-        printf("\tSubscribed:\t");
-        if (status & MQTT_SUBSCRIBED) {
-            printf("Yes\n");
-        }
-        else {
-            printf("No\n");
-        }
-    }
-}
-
-bool wait_for_mqtt_subscribed(void)
+bool wait_for_wifi_connected(void)
 {
     EventBits_t bits;
 
     bits = xEventGroupWaitBits(
-            wifi_mqtt_status,
-            MQTT_SUBSCRIBED,
+            wifi_status,
+            WIFI_CONNECTED,
             pdFALSE,
             pdFALSE,
-            MQTT_CONNECT_WAIT_TIMEOUT_S * 1000 / portTICK_PERIOD_MS);
+            WIFI_CONNECT_WAIT_TIMEOUT_S * 1000 / portTICK_PERIOD_MS);
 
-    if (bits & MQTT_SUBSCRIBED) {
-        // bit set
-        return true;
-    }
-    else {
-        // timeout
-        return false;
-    }
-}
-
-bool wait_for_mqtt_queue_empty(void)
-{
-    EventBits_t bits;
-
-    bits = xEventGroupWaitBits(
-            wifi_mqtt_status,
-            MQTT_QUEUE_EMPTY,
-            pdFALSE,
-            pdFALSE,
-            MQTT_SEND_WAIT_TIMEOUT_S * 1000 / portTICK_PERIOD_MS);
-
-    if (bits & MQTT_QUEUE_EMPTY) {
+    if (bits & WIFI_CONNECTED) {
         // bit set
         return true;
     }
@@ -589,7 +566,7 @@ bool wait_for_wifi_off(void)
     EventBits_t bits;
 
     bits = xEventGroupWaitBits(
-            wifi_mqtt_status,
+            wifi_status,
             WIFI_OFF,
             pdFALSE,
             pdFALSE,
@@ -603,4 +580,22 @@ bool wait_for_wifi_off(void)
         // timeout
         return false;
     }
+}
+
+bool wait_for_sending_complete(void)
+{
+    EventBits_t bits;
+
+    bits = xEventGroupWaitBits(
+             wifi_status,
+             COAP_QUEUE_EMPTY,
+             pdFALSE,
+             pdFALSE,
+             COAP_TIMEOUT_S * 1000 / portTICK_PERIOD_MS);
+ 
+    if (bits & COAP_QUEUE_EMPTY) {
+        // bit set
+        return true;
+    }
+    return false;
 }

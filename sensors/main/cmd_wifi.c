@@ -34,7 +34,7 @@ static void emit_wifi_help(void)
     printf("  show this help.\n");
     printf("\n");
     printf(WIFI_SHOW_COMMAND "\n");
-    printf("  show the current WiFi and MQTT status.\n");
+    printf("  show the current WiFi and COAP status.\n");
     printf("\n");
 }
 
@@ -100,8 +100,6 @@ static int tasks_wifi(int argc, char **argv)
         }
         else if (strcmp(argv[1], WIFI_SHOW_COMMAND) == 0) {
             emit_wifi();
-            printf("\n");
-            emit_mqtt_status();
             retval = 0;
         }
         else {

@@ -7,19 +7,11 @@
 #define __WIFI_H_
 
 /**
- * How long to wait for MQTT to be subscribed.
- * This includes the time to connect to WiFi.
- * In my system, this takes less than 10 seconds, so a 30 second timeout seems
+ * How long to wait for WiFi to be connected
+ * In my system, this takes less than 5 seconds, so a 10 second timeout seems
  * reasonable.
  */
-#define MQTT_CONNECT_WAIT_TIMEOUT_S 30
-
-/**
- * How long to wait for our MQTT message to be successfully sent.
- * This takes about a second on my system, so a 5 second timeout seems
- * reasonable.
- */
-#define MQTT_SEND_WAIT_TIMEOUT_S 5
+#define WIFI_CONNECT_WAIT_TIMEOUT_S 10
 
 /**
  * How long to wait for WiFi to come down.
@@ -31,7 +23,7 @@
 enum wifi_messages {
     WIFI_START,
     WIFI_STOP,
-    WIFI_SEND_MQTT
+    WIFI_SEND_TEMP,
 };
 
 /**
@@ -59,33 +51,17 @@ void wifi_disable(void);
 void wifi_restart(void);
 
 /**
- * Send last temperature reading over MQTT.
+ * Send last temperature reading.
  */
-void wifi_send_mqtt_temperature(void);
+void wifi_send_temperature(void);
 
 /**
- * Print various MQTT items.
+ * Wait for WiFi to be connected
  *
- * Unlike the WiFi stack, the MQTT client doesn't have a "get_info" type
- * function, so fake it with our config and internal status.
- */
-void emit_mqtt_status(void);
-
-/**
- * Wait for MQTT to be successfully subscribed.
- *
- * @return true when MQTT is subscribed
+ * @return true when WiFi is connected
  * @return false on timeout
  */
-bool wait_for_mqtt_subscribed(void);
-
-/**
- * Wait for the MQTT queue to be empty.
- *
- * @return true when MQTT queue is empty
- * @return false on timeout
- */
-bool wait_for_mqtt_queue_empty(void);
+bool wait_for_wifi_connected(void);
 
 /**
  * Wait for WiFi to be turned off.
@@ -94,5 +70,13 @@ bool wait_for_mqtt_queue_empty(void);
  * @return false on timeout
  */
 bool wait_for_wifi_off(void);
+
+/**
+ * Wait for our message ot be sent.
+ * 
+ * @return true if the message was sent.
+ * @return false if we timed out.
+ */
+bool wait_for_sending_complete(void);
 
 #endif // __WIFI_H_

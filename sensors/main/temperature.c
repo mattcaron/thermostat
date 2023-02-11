@@ -5,6 +5,7 @@
 
 #include "esp_log.h"
 #include "esp_sleep.h"
+#include "esp_system.h"
 #include <driver/gpio.h>
 #include <ds18x20.h>
 #include "freertos/FreeRTOS.h"
@@ -272,10 +273,9 @@ static void temp_task(void *pvParameters)
             --retries;
         }
 
-        ESP_LOGI(TAG, "Waiting for MQTT subscription.");
-        // Wait for mqtt to be subscribed before attempting to send our message
-        if (wait_for_mqtt_subscribed()) {
-
+        ESP_LOGI(TAG, "Waiting for WiFi");
+        // Wait for wifi to be up before sending our messge
+        if (wait_for_wifi_connected()) {
             if (comms_success) {
                 // good temp, update
                 if (current_config.use_celsius) {
@@ -288,40 +288,40 @@ static void temp_task(void *pvParameters)
                 }
 
                 // We've read our temperature, wake up our WiFi task to send it.
-                wifi_send_mqtt_temperature();
+                wifi_send_temperature();
             }
             else {
                 ESP_LOGE(TAG, "Temperature read invalid - not doing anything.");
             }
 
-            ESP_LOGI(TAG, "Waiting for MQTT queue to be empty.");
-            // While there are any MQTT messages outstanding, sleep for 10ms
-            // until they are sent.
-            if (wait_for_mqtt_queue_empty()) {
-
-                // Once the queue is empty, we can disable WiFi.
-
-                ESP_LOGI(TAG, "Waiting for WiFi off.");
-                // we're about to go sleep; disable wifi so it comes down
-                // gracefully, and then wait for it to actually be down.
-                wifi_disable();
-
-                if (!wait_for_wifi_off()) {
-                    ESP_LOGW(TAG,
-                         "Timeout waiting for wifi to come down, sleeping.");
-                }
-            }
-            else {
+            ESP_LOGI(TAG, "Waiting for message to send.");
+            // While there are any messages outstanding, wait.
+            if (!wait_for_sending_complete()) {
                 ESP_LOGW(TAG,
-                         "Timeout waiting for MQTT message to send, sleeping.");
+                         "Timeout waiting for message to send.");
+            }
+
+            // Regardless of sending timing out or not, we turn WiFi off and
+            // sleep.
+
+            ESP_LOGI(TAG, "Waiting for WiFi off.");
+            // we're about to go sleep; disable wifi so it comes down
+            // gracefully, and then wait for it to actually be down.
+            wifi_disable();
+
+            if (!wait_for_wifi_off()) {
+                ESP_LOGW(TAG,
+                "Timeout waiting for WiFi to come down.");
             }
         }
         else {
-            ESP_LOGW(TAG, "Timeout waiting to subscribe to MQTT, sleeping.");
+            ESP_LOGW(TAG, "Timeout waiting for WiFi to come up.");
         }
 
         // and we need to account for the time we spent executing, above.
         now = xTaskGetTickCount();
+
+        ESP_LOGI(TAG, "poll time = %d, now = %d, last_wake_time = %d", current_config.poll_time_sec, now, last_wake_time);
 
         // Calculate our periodic time delay, making sure to get the poll time
         // from the config so it's always up to date, and subtracting off the
@@ -329,6 +329,10 @@ static void temp_task(void *pvParameters)
         interval_microseconds =
             current_config.poll_time_sec * 1000000 -
             (now - last_wake_time) * portTICK_PERIOD_MS * 1000;
+
+        // MC - this is going negative if transmission takes too long.
+        // I think int64_t is also unsigned, so we need to check before we do
+        // the math.
 
         if (use_deep_sleep) {
             ESP_LOGW(TAG, "Deep sleep for %lld us.", interval_microseconds);

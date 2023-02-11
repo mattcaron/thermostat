@@ -11,11 +11,8 @@
 /** Maximum station name length. */
 #define MAX_STATION_NAME_LEN 64
 
-/** Maximum MQTT URI length. */
-#define MAX_MQTT_URI_LEN 256
-
-/** Maximum MQTT topic length. */
-#define MAX_MQTT_TOPIC_LEN 64
+/** Maximum URI length. */
+#define MAX_URI_LEN 512
 
 /**
  * Configuration storage structure.
@@ -27,11 +24,8 @@ typedef struct {
     bool use_celsius;                       /**< Whether to use Celsius or
                                                  Farenheit */
     uint16_t poll_time_sec;                 /**< Poll time in seconds. */
-    char mqtt_uri[MAX_MQTT_URI_LEN+1];      /**< MQTT uri to which we should
-                                                 subscribe. */
-    char mqtt_topic[MAX_MQTT_TOPIC_LEN+1];  /**< MQTT Topic to which we should
-                                                 publish our temp data. */
-    // TODO: Add MQTT channel(s)
+    char uri[MAX_URI_LEN+1];                /**< URI to which we should
+                                                 publish. */
 } config_storage_t;
 
 extern config_storage_t current_config;
