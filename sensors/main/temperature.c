@@ -51,6 +51,12 @@ static const char *TAG = "temperature";
 #define MEASUREMENT_DELAY_MS DS18B20_12BIT_TIME + 1
 
 /*
+ * Delay in MS after sensor on to wait before doing something. This allows for
+ * power to settle, capacitors to charge, etc.
+ */
+#define SENSOR_ON_DELAY_MS 1
+
+/*
  * If we are running the DS18B20 in its default mode (12 bit resolution), we
  * don't need to update the config because new parts will be set to the
  * defaults. However, if not, this needs to be set to 1 so we update the config
@@ -77,6 +83,8 @@ static void sensor_on(void)
      */
     ESP_ERROR_CHECK(gpio_set_level(POWER_GPIO, 1));
     ESP_ERROR_CHECK(gpio_set_pull_mode(SENSOR_GPIO, GPIO_PULLUP_ONLY));
+
+    vTaskDelay(SENSOR_ON_DELAY_MS / portTICK_PERIOD_MS);
 }
 
 /**
