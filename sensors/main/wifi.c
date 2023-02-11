@@ -69,8 +69,15 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data)
 {
     EventBits_t status;
+    esp_err_t result;
 
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+        result = tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA,
+                                            current_config.station_name);
+        if (result != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to set hostname: %s", esp_err_to_name(result));
+        }
+
         ESP_ERROR_CHECK(esp_wifi_connect());
     }
     else if (event_base == WIFI_EVENT &&

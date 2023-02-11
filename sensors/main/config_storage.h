@@ -7,9 +7,10 @@
 #define __CONFIG_STORAGE_H_
 
 #include "esp_wifi_types.h"
+#include "esp_netif.h"
 
-/** Maximum station name length. */
-#define MAX_STATION_NAME_LEN 64
+/** Maximum station name length; determined by TCPIP hostname max size. */
+#define MAX_STATION_NAME_LEN (TCPIP_HOSTNAME_MAX_SIZE - 1)
 
 /** Maximum URI length. */
 #define MAX_URI_LEN 512

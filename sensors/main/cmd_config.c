@@ -102,8 +102,9 @@ static void emit_set_help(void)
     printf("    " CONFIG_SET_NAME
            " = the name of this station (%d char max).\n"
            "        Note: This is used for the both the DHCP client name and\n"
-           "        is sent as part of the CoAP payload, so format it "
-                    "accordingly.\n",
+           "        is sent as part of the CoAP payload, so format it\n"
+           "        accordingly. An invalid format will result in a failure\n"
+           "        to set the hostname.",
            MAX_STATION_NAME_LEN);
     printf("        Note: surround the name with quotes if you use spaces.\n");
     printf("    " CONFIG_SET_TEMP_UNIT
