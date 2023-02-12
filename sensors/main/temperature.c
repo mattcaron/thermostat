@@ -240,9 +240,13 @@ static void temp_task(void *pvParameters)
 {
     bool comms_success;
     int retries;
-    TickType_t last_wake_time = xTaskGetTickCount();
-    TickType_t now;
+    TickType_t last_wake_time_ticks = xTaskGetTickCount();
+    TickType_t next_wake_time_ticks = last_wake_time_ticks +
+                                      (current_config.poll_time_sec * 1000) /
+                                      portTICK_PERIOD_MS;
+    TickType_t now_ticks;
     uint64_t interval_microseconds = 0;
+
 
     float temp_temp;
 
@@ -274,7 +278,7 @@ static void temp_task(void *pvParameters)
         }
 
         ESP_LOGI(TAG, "Waiting for WiFi");
-        // Wait for wifi to be up before sending our messge
+        // Wait for wifi to be up before sending our message
         if (wait_for_wifi_connected()) {
             if (comms_success) {
                 // good temp, update
@@ -319,34 +323,44 @@ static void temp_task(void *pvParameters)
         }
 
         // and we need to account for the time we spent executing, above.
-        now = xTaskGetTickCount();
+        now_ticks = xTaskGetTickCount();
 
-        ESP_LOGI(TAG, "poll time = %d, now = %d, last_wake_time = %d", current_config.poll_time_sec, now, last_wake_time);
+        ESP_LOGI(TAG, "poll time = %d sec, now_ticks = %d, "
+                      "last_wake_time_ticks = %d, next_wake_time_ticks = %d", current_config.poll_time_sec, now_ticks,
+                      last_wake_time_ticks, next_wake_time_ticks);
 
-        // Calculate our periodic time delay, making sure to get the poll time
-        // from the config so it's always up to date, and subtracting off the
-        // time we spent executing.
-        interval_microseconds =
-            current_config.poll_time_sec * 1000000 -
-            (now - last_wake_time) * portTICK_PERIOD_MS * 1000;
-
-        // MC - this is going negative if transmission takes too long.
-        // I think int64_t is also unsigned, so we need to check before we do
-        // the math.
-
-        if (use_deep_sleep) {
-            ESP_LOGW(TAG, "Deep sleep for %lld us.", interval_microseconds);
-
-            esp_deep_sleep(interval_microseconds);
+        if (now_ticks > next_wake_time_ticks) {
+            ESP_LOGW(TAG, "We took longer to send our result than our interval "
+                          "time - not sleeping ");
         }
         else {
-            ESP_LOGW(TAG, "Normal sleep for %lld us.", interval_microseconds);
+            // Calculate our periodic time delay, making sure to get the poll
+            // time from the config so it's always up to date, and subtracting
+            // off the time we spent executing.
+            //
+            // Note that, if we spent too long executing, now will be greater
+            // than next_wake_time, which would cause this to go negative,
+            // but we test for this above and just skip the sleep altogether.
+            interval_microseconds = (next_wake_time_ticks - now_ticks) *
+                                        portTICK_PERIOD_MS * 1000;
 
-            vTaskDelay((interval_microseconds / 1000) / portTICK_PERIOD_MS);
+            if (use_deep_sleep) {
+                ESP_LOGW(TAG, "Deep sleep for %lld us.", interval_microseconds);
+
+                esp_deep_sleep(interval_microseconds);
+            }
+            else {
+                ESP_LOGW(TAG, "Normal sleep for %lld us.", interval_microseconds);
+
+                vTaskDelay((interval_microseconds / 1000) / portTICK_PERIOD_MS);
+            }
         }
 
-        // reset last_wake_time
-        last_wake_time = xTaskGetTickCount();
+        // reset last wake time, calculate next wake time
+        last_wake_time_ticks = xTaskGetTickCount();
+        next_wake_time_ticks = last_wake_time_ticks +
+                               (current_config.poll_time_sec * 1000) /
+                               portTICK_PERIOD_MS;
 
         ESP_LOGI(TAG, "Waking up");
         // Enable WiFi again, then loop.
