@@ -91,7 +91,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         // to connect - doing so causes an error.
         status = xEventGroupGetBits(wifi_status);
         if (status & (WIFI_OFF | WIFI_STOPPING)) {
-            ESP_LOGI(TAG, "WiFI is shutting down, not reconnecting.");
+            ESP_LOGE(TAG, "WiFI is shutting down, not reconnecting.");
         }
         else {
             if (s_retry_num < WIFI_MAXIMUM_RETRIES) {
@@ -453,7 +453,6 @@ static bool coap_send_temperature(void)
 static void wifi_task(void *pvParameters)
 {
     uint8_t message;
-    EventBits_t status;
 
     // basic wifi init (without configuration)
     wifi_init();
@@ -463,22 +462,12 @@ static void wifi_task(void *pvParameters)
             switch(message) {
                 case WIFI_START:
                     // TODO: Add some blinkenlights feedback here?
-                    status = xEventGroupGetBits(wifi_status);
-                    if (status & WIFI_CONNECTED) {
-                        ESP_LOGI(TAG,
-                                 "WiFi already connected, discarding "
-                                 "spurious WIFI_START message");
+                    if (is_config_valid(&current_config)) {
+                        ESP_LOGI(TAG, "wifi config looks valid, connecting");
+                        connect_wifi();
                     }
                     else {
-                        if (is_config_valid(&current_config)) {
-                            ESP_LOGI(TAG,
-                                     "wifi config looks valid, connecting");
-                            connect_wifi();
-                        }
-                        else {
-                            ESP_LOGI(TAG,
-                                     "invalid config, not connecting to wifi");
-                        }
+                        ESP_LOGE(TAG, "invalid config, not connecting to wifi");
                     }
                     break;
                 case WIFI_STOP:
@@ -487,7 +476,6 @@ static void wifi_task(void *pvParameters)
                     disconnect_wifi();
                     break;
                 case WIFI_SEND_TEMP:
-                    status = xEventGroupGetBits(wifi_status);
                     if (coap_send_temperature()) {
                         ESP_LOGI(TAG, "Temperature sent successfully");
                     }
