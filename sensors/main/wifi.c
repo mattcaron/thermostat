@@ -40,6 +40,7 @@
 #include "wifi.h"
 #include "config_storage.h"
 #include "temperature.h"
+#include "ap_cache_storage.h"
 
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t wifi_status;
@@ -59,6 +60,8 @@ static EventGroupHandle_t wifi_status;
                                      reply from the CoAP server. */
 
 static const char *TAG = "WiFi";
+
+static bool cache_is_valid = false;
 
 /**
  * Counter for the number of wifi retries so far
@@ -148,6 +151,12 @@ static void wifi_init(void)
      * determines whether it should write to NVS (flash) or not. We have this
      * disabled, so it shouldn't write to NVS. Setting the storage here should
      * effectively do the same thing, so - belt and suspenders.
+     *
+     * Note that the wifi config storage and caching almost certainly duplicates
+     * large portions of this. However, given the nature of this application
+     * (that is, frequent reboots due to how deep sleep works on the ESP8266),
+     * I don't want to see writes to flash that frequently, so I implemented it
+     * myself for more direct control.
      */
     ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
 
@@ -189,6 +198,7 @@ static void wifi_deinit(void)
 static void connect_wifi(void)
 {
     wifi_config_t wifi_config = {};
+    wifi_ap_record_t ap_info = {};
 
     xEventGroupClearBits(wifi_status, WIFI_OFF);
 
@@ -196,6 +206,25 @@ static void connect_wifi(void)
             sizeof(wifi_config.sta.ssid));
     strncpy((char *)wifi_config.sta.password, current_config.pass,
             sizeof(wifi_config.sta.password));
+
+    if (current_config.cache_ap_info) {
+        ESP_LOGI(TAG, "AP info cache is enabled, reading back.");
+        cache_is_valid = read_ap_cache_from_nvs();
+        if (cache_is_valid) {
+            ESP_LOGI(TAG, "AP info cache is valid, using.");
+            wifi_config.sta.bssid_set = true;
+            memcpy(wifi_config.sta.bssid, ap_cache.bssid, sizeof(wifi_config.sta.bssid));
+            wifi_config.sta.channel = ap_cache.channel;
+            ESP_LOGI(TAG, "Cached BSSID = %x:%x:%x:%x:%x:%x, channel = %d",
+            ap_cache.bssid[0], ap_cache.bssid[1], ap_cache.bssid[2], ap_cache.bssid[3], ap_cache.bssid[4], ap_cache.bssid[5], ap_cache.channel);
+        }
+        else {
+            ESP_LOGI(TAG, "AP info cache is invalid.");
+        }
+    }
+    else {
+        ESP_LOGI(TAG, "AP info cache is disabled.");
+    }
 
     /* NOTE: In the example code, they ratchet up the minimum security to
      * refuse to connect to WiFi networks with poor security. I have removed
@@ -210,8 +239,9 @@ static void connect_wifi(void)
 
     ESP_LOGI(TAG, "WiFi config finished.");
 
-    /* Waiting until either the connection is established (WIFI_CONNECTED_BIT)
-     * or connection failed for the maximum number of re-tries (WIFI_FAIL_BIT). * The bits are set by wifi_event_handler() (see above). */
+    /* Waiting until either the connection is established (WIFI_CONNECTED)
+     * or connection failed for the maximum number of re-tries (WIFI_FAIL).
+     * The bits are set by wifi_event_handler() (see above). */
     EventBits_t status = xEventGroupWaitBits(
                              wifi_status,
                              WIFI_CONNECTED | WIFI_FAIL,
@@ -221,12 +251,45 @@ static void connect_wifi(void)
 
     if (status & WIFI_CONNECTED) {
         ESP_LOGI(TAG, "connected to SSID: %s", wifi_config.sta.ssid);
-        // We are now connected to WiFi
-    }
+        // We are now connected to WiFi.
+        // If we're supposed to cache info and the cache isn't currently valid,
+        // write it and set the cache to valid.
+        if (current_config.cache_ap_info && !cache_is_valid) {
+            ESP_ERROR_CHECK(esp_wifi_sta_get_ap_info(&ap_info));
+            ap_cache.channel = ap_info.primary; // primary channel
+            memcpy(ap_cache.bssid, ap_info.bssid, sizeof(ap_cache.bssid));
+
+            if (write_ap_cache_to_nvs()) {
+                cache_is_valid = true;
+                ESP_LOGI(TAG, "Saved AP info to cache.");
+            }
+            else {
+                ESP_LOGE(TAG, "Failed to save AP info to cache.");
+            }
+        }
+}
     else if (status & WIFI_FAIL) {
         ESP_LOGI(TAG, "Failed to connect to SSID: %s", wifi_config.sta.ssid);
         // We don't need to clear the connected bit, because it's cleared when
         // we get the disconnected event in the event handler.
+
+        // But we do clear this bit because we've handled it.
+        xEventGroupClearBits(wifi_status, WIFI_FAIL);
+
+        if (current_config.cache_ap_info && cache_is_valid) {
+            // If the we failed to connect, then assume our cache is now invalid
+            // because we tried to connect to an AP that didn't exist, so any
+            // information is obsolete.
+            cache_is_valid = false;
+
+            // and, if we were relying on the cached data, then post a message
+            // to the queue to try again - which will just kick is back into
+            // this function with an invalid cache, but is cleaner than adding a
+            // loop.
+            wifi_restart();
+        }
+        // otherwise, we either weren't caching data or the cache wasn't valid,
+        // and should just stop trying.
     }
     else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");

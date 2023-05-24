@@ -23,6 +23,7 @@ static const char *TAG = "cmd_config";
 #define CONFIG_SAVE_COMMAND "save"
 #define CONFIG_SET_SSID "ssid"
 #define CONFIG_SET_PASS "pass"
+#define CONFIG_SET_CACHE_AP "cache_ap"
 #define CONFIG_SET_NAME "name"
 #define CONFIG_SET_TEMP_UNIT "unit"
 #define CONFIG_SET_POLL_INTERVAL "polling"
@@ -61,6 +62,14 @@ static void emit_config_items(config_storage_t *config)
     printf("\tStation Name: \t%s\n", config->station_name);
     printf("\tSSID:    \t%s\n", config->ssid);
     printf("\tPassword:\t%s\n", config->pass);
+    printf("\tCache AP Info:\t");
+    if (config->cache_ap_info) {
+        printf("Yes");
+    }
+    else {
+        printf("No");
+    }
+    printf("\n");
     if (config->use_celsius) {
         printf("\tTemp Unit:\tC\n");
     }
@@ -99,6 +108,13 @@ static void emit_set_help(void)
            MAX_SSID_LEN);
     printf("    " CONFIG_SET_PASS
            " = password for AP (%d char max).\n", MAX_PASSPHRASE_LEN);
+    printf("    " CONFIG_SET_CACHE_AP
+           " = whether or not to cache the current AP info during sleep (Y or N).\n"
+           "        Enabling this saves power because it doesn't rescan for\n"
+           "        the best AP after sleeping, which assumes that the\n"
+           "        network won't change while it is sleeping.\n"
+           "        Disabling this will respond better to changes in network\n"
+           "        topology, but will reduce battery life.\n");
     printf("    " CONFIG_SET_NAME
            " = the name of this station (%d char max).\n"
            "        Note: This is used for the both the DHCP client name and\n"
@@ -214,6 +230,24 @@ static int handle_set(int argc, char **argv)
                 }
             }
         }
+        else if (strcmp(argv[2], CONFIG_SET_CACHE_AP) == 0) {
+            if (strlen(argv[3]) != 1) {
+                printf("Error: cache AP setting should be 'Y' or 'N'");
+            }
+            else {
+                if (argv[3][0] == 'Y') {
+                    new_config.cache_ap_info = true;
+                    retval = 0;
+                }
+                else if (argv[3][0] == 'N') {
+                    new_config.cache_ap_info = false;
+                    retval = 0;
+                }
+                else {
+                    printf("Error: cache AP setting should be 'Y' or 'N'");
+                }
+            }
+        }        
         else if (strcmp(argv[2], CONFIG_SET_POLL_INTERVAL) == 0) {
             temp = atoi(argv[3]);
             if (temp > UINT16_MAX) {

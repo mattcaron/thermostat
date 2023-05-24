@@ -314,3 +314,10 @@ Take your best guess.
 ### **But, half the links are to Amazon!**
 
 Yeah, I'm a hypocrite too, what's your point?
+
+## Acknowledgements
+
+1. I totally cribbed battery saving techniques from
+   <https://blog.sarine.nl/2020/01/01/1-year-sensor.html>
+1. The above linked to <https://www.bakke.online/index.php/2017/06/24/esp8266-wifi-power-reduction-avoiding-network-scan/>
+ which I also incorporated (though I just wrote to NVS, not RTC.)

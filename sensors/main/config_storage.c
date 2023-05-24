@@ -22,9 +22,10 @@
 #define NVS_URI "uri"
 
 #define NVS_BITFIELD_USE_CELSIUS 0x00000001
+#define NVS_BITFIELD_CACHE_AP    0x00000010
 
 // defaults
-#define NVS_BITFIELD_DEFAULT NVS_BITFIELD_USE_CELSIUS
+#define NVS_BITFIELD_DEFAULT (NVS_BITFIELD_USE_CELSIUS | NVS_BITFIELD_CACHE_AP)
 #define POLL_TIME_DEFAULT_SEC 600
 
 config_storage_t current_config;
@@ -107,6 +108,13 @@ bool read_config_from_nvs(config_storage_t *config)
             config->use_celsius = false;
         }
 
+        if (bitfield & NVS_BITFIELD_CACHE_AP) {
+            config->cache_ap_info = true;
+        }
+        else {
+            config->cache_ap_info = false;
+        }
+
         ret = nvs_get_u16(handle, NVS_POLL_TIME_SEC, &config->poll_time_sec);
         if (ret == ESP_ERR_NVS_NOT_FOUND) {
             config->poll_time_sec = POLL_TIME_DEFAULT_SEC;
@@ -136,6 +144,13 @@ bool write_config_to_nvs(config_storage_t *config)
     }
     else {
         bitfield &= ~NVS_BITFIELD_USE_CELSIUS;
+    }
+
+    if (config->cache_ap_info) {
+        bitfield |= NVS_BITFIELD_CACHE_AP;
+    }
+    else {
+        bitfield &= ~NVS_BITFIELD_CACHE_AP;
     }
 
     // Write out our config items.
