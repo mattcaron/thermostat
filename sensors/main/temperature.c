@@ -68,10 +68,14 @@ static const char *TAG = "temperature";
 // The last temperature we read.
 float last_temp = 0;
 
-// Use deep sleep. Defaults to true, but can be disabled via a console command.
+// Use deep sleep. Set to false for easier debugging.
+bool use_deep_sleep = true;
+
+// Pause normal operation. Defaults to false, but can be enabled via a console 
+// command. Implies disabling of deep sleep.
 // Note that there is no way to re-enable it; we just assume the user will 
 // reboot the whole unit (and instruct them to do so).
-bool use_deep_sleep = true;
+bool paused = false;
 
 /**
  * Turn on our sensor.
@@ -256,6 +260,11 @@ static void temp_task(void *pvParameters)
 #endif // CHECK_DS18B20_CONFIG
 
     while (true) {
+        while(paused) {
+            // all processing paused, just sleep for a long time (10s)
+            vTaskDelay(10000 / portTICK_PERIOD_MS);
+        }
+
         comms_success = false;
         retries = 5; // prevent infinite tight loop
 
@@ -344,7 +353,11 @@ static void temp_task(void *pvParameters)
             interval_microseconds = (next_wake_time_ticks - now_ticks) *
                                         portTICK_PERIOD_MS * 1000;
 
-            if (use_deep_sleep) {
+            // There is a possibility that we got here before the user could
+            // type "pause". If so, we'd go into a deep sleep which is a reboot,
+            // which means this might happen repeatedly. So, if pause is set by
+            // here, don't deep sleep.
+            if (use_deep_sleep && !paused) {
                 ESP_LOGW(TAG, "Deep sleep for %lld us.", interval_microseconds);
 
                 esp_deep_sleep(interval_microseconds);
@@ -381,4 +394,9 @@ void start_temp_polling(void)
 void disable_deep_sleep(void)
 {
     use_deep_sleep = false;
+}
+
+void enable_pause(void)
+{
+    paused = true;
 }

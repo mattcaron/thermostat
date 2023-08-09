@@ -34,6 +34,7 @@ static void register_version(void);
 static void register_restart(void);
 static void register_tasks(void);
 static void register_nosleep(void);
+static void register_pause(void);
 
 void register_system(void)
 {
@@ -43,6 +44,7 @@ void register_system(void)
     register_restart();
     register_tasks();
     register_nosleep();
+    register_pause();
 }
 
 /* 'version' command */
@@ -174,6 +176,14 @@ static int disable_sleep(int argc, char **argv)
     return 0;
 }
 
+static int pause(int argc, char **argv)
+{
+    enable_pause();
+    printf("Temperature processing and sleeping paused.\n");
+    printf("Perform any needed configuration, then issue a `restart` command.\n");
+    return 0;
+}
+
 static void register_nosleep(void)
 {
     const esp_console_cmd_t cmd = {
@@ -181,6 +191,17 @@ static void register_nosleep(void)
         .help = "Disable sleep mode",
         .hint = NULL,
         .func = &disable_sleep,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
+static void register_pause(void)
+{
+    const esp_console_cmd_t cmd = {
+        .command = "pause",
+        .help = "Disable temperature sending",
+        .hint = NULL,
+        .func = &pause,
     };
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }

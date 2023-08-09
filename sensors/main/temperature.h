@@ -36,4 +36,9 @@ void start_temp_polling(void);
  */
 void disable_deep_sleep(void);
 
+/**
+ * Pause normal operation so it's easier to interface with the UI.
+ */
+void enable_pause(void);
+
 #endif // __TEMPERATURE_H_
