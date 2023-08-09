@@ -52,6 +52,10 @@ which you then consume in NodeRED (also below) and make it do what you want.
 (May never be implemented)
 
 1. Implement CLI command completion hinting (see iperf example code).
+1. CoAP DTLS
+   1. The ESP8266 library supports it.
+   1. The NodeRED node-red-contrib-coap doesn't.
+   1. A proxy would likely work here.
 
 **Notes:**
 
