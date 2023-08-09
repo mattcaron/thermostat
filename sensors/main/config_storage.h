@@ -44,9 +44,8 @@ bool read_config_from_nvs(config_storage_t *config);
 
 /**
  * Write a config to NVS.
- * @param [in] config Reference to configuration structure to
- *                     receive current config. Note that this will
- *                     be zeroed before being populated.
+ * @param [in] config Reference to configuration structure which should be
+ *                    written to NVS.
  *
  * @return true on success.
  * @return false on failure.
