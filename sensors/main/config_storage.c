@@ -127,12 +127,9 @@ bool read_config_from_nvs(config_storage_t *config)
 bool write_config_to_nvs(config_storage_t *config)
 {
     nvs_handle handle;
-    esp_err_t ret;
     uint32_t bitfield = 0;
 
-    ret = nvs_open(NVS_CONFIG_NAMESPACE, NVS_READWRITE, &handle);
-
-    ESP_ERROR_CHECK(ret);
+    ESP_ERROR_CHECK(nvs_open(NVS_CONFIG_NAMESPACE, NVS_READWRITE, &handle));
 
     if (config->use_celsius) {
         bitfield |= NVS_BITFIELD_USE_CELSIUS;
