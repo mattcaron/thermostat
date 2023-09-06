@@ -56,6 +56,7 @@ which you then consume in NodeRED (also below) and make it do what you want.
    1. The ESP8266 library supports it.
    1. The NodeRED node-red-contrib-coap doesn't.
    1. A proxy would likely work here.
+1. IPv6 support for static IPs.
 
 **Notes:**
 

@@ -24,6 +24,11 @@ static const char *TAG = "cmd_config";
 #define CONFIG_SET_SSID "ssid"
 #define CONFIG_SET_PASS "pass"
 #define CONFIG_SET_CACHE_AP "cache_ap"
+#define CONFIG_SET_USE_DHCP "use_dhcp"
+#define CONFIG_SET_IP_ADDR "ip_addr"
+#define CONFIG_SET_NETMASK "netmask"
+#define CONFIG_SET_GATEWAY "gateway"
+#define CONFIG_SET_DNS "dns"
 #define CONFIG_SET_NAME "name"
 #define CONFIG_SET_TEMP_UNIT "unit"
 #define CONFIG_SET_POLL_INTERVAL "polling"
@@ -59,6 +64,10 @@ static bool is_unsaved_changes(void)
  */
 static void emit_config_items(config_storage_t *config)
 {
+    // Max IPv4 addr is 15 chars + NUL
+    char temp_buf[MAX_IPV4_LEN];
+    char * ret_buf;
+
     printf("\tStation Name: \t%s\n", config->station_name);
     printf("\tSSID:    \t%s\n", config->ssid);
     printf("\tPassword:\t%s\n", config->pass);
@@ -70,6 +79,65 @@ static void emit_config_items(config_storage_t *config)
         printf("No");
     }
     printf("\n");
+    printf("\tUse DHCP:\t");
+    if (config->use_dhcp) {
+        printf("Yes");
+    }
+    else {
+        printf("No");
+    }
+    printf("\n");
+    // if DHCP is off, print static
+    if (!config->use_dhcp) {
+        // Note on ip4addr_ntoa_r:
+        // temp_buf is supplied by us and ret_buf either a pointer back to it or
+        // NULL if the buffer was too small
+
+        ret_buf = ip4addr_ntoa_r(&config->ipaddr, temp_buf, sizeof(temp_buf));
+        if (ret_buf == NULL) {
+            ESP_LOGE(TAG, "Buffer too small when formatting IP address for printing");
+        }
+        else {
+            printf("\tIP Address:\t%s\n", ret_buf);
+        }
+
+        ret_buf = ip4addr_ntoa_r(&config->netmask, temp_buf, sizeof(temp_buf));
+        if (ret_buf == NULL) {
+            ESP_LOGE(TAG, "Buffer too small when formatting netmask for printing");
+        }
+        else {
+            printf("\tNetmask:\t%s\n", ret_buf);
+        }
+
+        // gateway is optional, only decode if nonzero
+        if (config->gateway.addr == 0) {
+                printf("\tGateway:\tNot set\n");            
+        } 
+        else {
+            ret_buf = ip4addr_ntoa_r(&config->gateway, temp_buf, sizeof(temp_buf));
+            if (ret_buf == NULL) {
+                ESP_LOGE(TAG, "Buffer too small when formatting gateway for printing");
+            }
+            else {
+                printf("\tGateway:\t%s\n", ret_buf);
+            }            
+        }
+
+        // same for DNS
+        if (config->dns.addr == 0) {
+                printf("\tDNS Server:\tNot set\n");            
+        } 
+        else {
+            ret_buf = ip4addr_ntoa_r(&config->dns, temp_buf, sizeof(temp_buf));
+            if (ret_buf == NULL) {
+                ESP_LOGE(TAG, "Buffer too small when formatting DNS for printing");
+            }
+            else {
+                printf("\tDNS Server:\t%s\n", ret_buf);
+            }            
+        }
+    }
+
     if (config->use_celsius) {
         printf("\tTemp Unit:\tC\n");
     }
@@ -116,6 +184,28 @@ static void emit_set_help(void)
            "        Disabling this will respond better to changes in network\n"
            "        topology, but will reduce battery life.\n"
            "        In testing, this shortens connection times by about 300ms.\n");
+    printf("    " CONFIG_SET_USE_DHCP
+           " = whether or not to use a DHCP client to acquire an IP address (Y or N).\n"
+           "        Disabling this saves power because it doesn't need to reacquire\n"
+           "        an IP address on boot. However, you will need to enter a static\n"
+           "        IP configuration.\n"
+           "        In testing, this shortens connections times by about 1s.\n");
+    printf("    " CONFIG_SET_IP_ADDR
+           " = the static IP address to use if USE_DHCP is set to N.\n"
+           "        This is ignored if USE_DHCP is set to Y.\n");
+    printf("    " CONFIG_SET_NETMASK
+           " = the netmask to use if USE_DHCP is set to N.\n"
+           "        This is ignored if USE_DHCP is set to Y.\n");
+    printf("    " CONFIG_SET_GATEWAY
+           " = the gateway to use if USE_DHCP is set to N.\n"
+           "        This is ignored if USE_DHCP is set to Y.\n"
+           "        This is optional. If unset, the sensor will not be able\n"
+           "        to get to the internet (which may be desirable)\n");
+    printf("    " CONFIG_SET_DNS
+           " = the DNS server to use if USE_DHCP is set to N.\n"
+           "        This is ignored if USE_DHCP is set to Y.\n"
+           "        This is optional. If unset, the sensor will not be able\n"
+           "        to get to perform DNS lookups (which may be desirable)\n");
     printf("    " CONFIG_SET_NAME
            " = the name of this station (%d char max).\n"
            "        Note: This is used for the both the DHCP client name and\n"
@@ -173,6 +263,7 @@ static int handle_set(int argc, char **argv)
     // Assume failure.
     int retval = 1;
     int temp;
+    ip4_addr_t temp_ip;
 
     // at this point, argument should be like:
     //     config set ssid frobz
@@ -273,6 +364,92 @@ static int handle_set(int argc, char **argv)
                 retval = 0;
             }
         }
+        else if (strcmp(argv[2], CONFIG_SET_USE_DHCP) == 0) {
+            if (strlen(argv[3]) != 1) {
+                printf("Error: use DHCP setting should be 'Y' or 'N'.\n");
+            }
+            else {
+                if (argv[3][0] == 'Y') {
+                    new_config.use_dhcp = true;
+                    retval = 0;
+                }
+                else if (argv[3][0] == 'N') {
+                    new_config.use_dhcp = false;
+                    retval = 0;
+                }
+                else {
+                    printf("Error: use DHCP setting should be 'Y' or 'N'.\n");
+                }
+            }
+        }
+        else if (strcmp(argv[2], CONFIG_SET_IP_ADDR) == 0) {
+            if (strlen(argv[3]) > MAX_IPV4_LEN) {
+                printf("Error: IP address too long, maximum is %d"
+                       " characters.\n", MAX_IPV4_LEN);
+            }
+            else {
+                // 1 if IP could be converted to addr, 0 on failure 
+                if (ip4addr_aton(argv[3], &temp_ip) == 0) {
+                    printf("Error: IP address is invalid. It must be in the"
+                           " form 192.168.1.100. (Only IPv4 is supported at"
+                           " this time.\n");
+                } else {
+                    new_config.ipaddr.addr = temp_ip.addr;
+                    retval = 0;
+                }
+            }
+        }
+        else if (strcmp(argv[2], CONFIG_SET_NETMASK) == 0) {
+            if (strlen(argv[3]) > MAX_IPV4_LEN) {
+                printf("Error: Netmask IP address too long, maximum is %d"
+                       " characters.\n", MAX_IPV4_LEN);
+            }
+            else {
+                // 1 if IP could be converted to addr, 0 on failure 
+                if (ip4addr_aton(argv[3], &temp_ip) == 0) {
+                    printf("Error: Netmask IP address is invalid. It must be"
+                           " in the form 192.168.1.100. (Only IPv4 is"
+                           " supported at this time.\n");
+                } else {
+                    new_config.netmask.addr = temp_ip.addr;
+                    retval = 0;
+                }
+            }
+        }
+        else if (strcmp(argv[2], CONFIG_SET_GATEWAY) == 0) {
+            if (strlen(argv[3]) > MAX_IPV4_LEN) {
+                printf("Error: Gateway IP address too long, maximum is %d"
+                       " characters.\n", MAX_IPV4_LEN);
+            }
+            else {
+                // 1 if IP could be converted to addr, 0 on failure 
+                if (ip4addr_aton(argv[3], &temp_ip) == 0) {
+                    printf("Error: Gateway IP address is invalid. It must be"
+                           " in the form 192.168.1.100. (Only IPv4 is"
+                           " supported at this time.\n");
+                } else {
+                    new_config.gateway.addr = temp_ip.addr;
+                    retval = 0;
+                }
+            }
+        }
+        else if (strcmp(argv[2], CONFIG_SET_DNS) == 0) {
+            if (strlen(argv[3]) > MAX_IPV4_LEN) {
+                printf("Error: DNS server IP address too long, maximum is %d"
+                       " characters.\n", MAX_IPV4_LEN);
+            }
+            else {
+                // 1 if IP could be converted to addr, 0 on failure 
+                if (ip4addr_aton(argv[3], &temp_ip) == 0) {
+                    printf("Error: DNS server IP address is invalid. It must be"
+                           " in the form 192.168.1.100. (Only IPv4 is"
+                           " supported at this time.\n");
+                } else {
+                    new_config.dns.addr = temp_ip.addr;
+                    retval = 0;
+                }
+            }
+        }        
         else {
             printf("Error: Unknown config set command %s\n", argv[2]);
         }

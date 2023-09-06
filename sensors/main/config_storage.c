@@ -20,9 +20,14 @@
 #define NVS_BITFIELD "bits"
 #define NVS_POLL_TIME_SEC "poll"
 #define NVS_URI "uri"
+#define NVS_IP "ip"
+#define NVS_NETMASK "nm"
+#define NVS_GATEWAY "gw"
+#define NVS_DNS "dns"
 
 #define NVS_BITFIELD_USE_CELSIUS 0x00000001
 #define NVS_BITFIELD_CACHE_AP    0x00000010
+#define NVS_BITFIELD_USE_DHCP    0x00000100
 
 // defaults
 #define NVS_BITFIELD_DEFAULT (NVS_BITFIELD_USE_CELSIUS | NVS_BITFIELD_CACHE_AP)
@@ -55,6 +60,36 @@ static esp_err_t read_config_string_from_nvs(nvs_handle handle, const char *key,
     }
 
     return ret;
+}
+
+/**
+ * Helper function to read an IP from NVS.
+ * 
+ * @note This calls an ESP_ERR_CHECK and will throw an error for all errors that
+ *       we don't handle.
+ *
+ * @param handle [in]  handle to open NVS partition.
+ * @param key    [in]  key whose value to retrieve.
+ * 
+ * @return If found, the IP as read from NVS.
+ * @return If not found, 0
+ */
+static uint32_t read_ip_from_nvs(nvs_handle handle, const char *key)
+{
+    esp_err_t ret;
+    uint32_t temp_ip = 0;
+
+    ret = nvs_get_u32(handle, key, &temp_ip);
+    if (ret == ESP_ERR_NVS_NOT_FOUND) {
+        temp_ip = 0;
+        ret = ESP_OK;
+    }
+    // else the IP was either successfully retrieved or there is some other
+    // error which we will test below.
+
+    ESP_ERROR_CHECK(ret);
+
+    return temp_ip;
 }
 
 bool read_config_from_nvs(config_storage_t *config)
@@ -115,6 +150,13 @@ bool read_config_from_nvs(config_storage_t *config)
             config->cache_ap_info = false;
         }
 
+        if (bitfield & NVS_BITFIELD_USE_DHCP) {
+            config->use_dhcp = true;
+        }
+        else {
+            config->use_dhcp = false;
+        }
+
         ret = nvs_get_u16(handle, NVS_POLL_TIME_SEC, &config->poll_time_sec);
         if (ret == ESP_ERR_NVS_NOT_FOUND) {
             config->poll_time_sec = POLL_TIME_DEFAULT_SEC;
@@ -125,6 +167,12 @@ bool read_config_from_nvs(config_storage_t *config)
         ESP_ERROR_CHECK(read_config_string_from_nvs(handle, NVS_URI,
             config->uri, sizeof(config->uri)));
 
+        // these following 4 IPs will be ignored if use_dhcp is false
+        
+        config->ipaddr.addr = read_ip_from_nvs(handle, NVS_IP);
+        config->netmask.addr = read_ip_from_nvs(handle, NVS_NETMASK);
+        config->gateway.addr = read_ip_from_nvs(handle, NVS_GATEWAY);
+        config->dns.addr = read_ip_from_nvs(handle, NVS_DNS);
     }
 
     nvs_close(handle);
@@ -153,6 +201,13 @@ bool write_config_to_nvs(config_storage_t *config)
         bitfield &= ~NVS_BITFIELD_CACHE_AP;
     }
 
+    if (config->use_dhcp) {
+        bitfield |= NVS_BITFIELD_USE_DHCP;
+    }
+    else {
+        bitfield &= ~NVS_BITFIELD_USE_DHCP;
+    }    
+
     // Write out our config items.
     ESP_ERROR_CHECK(nvs_set_str(handle, NVS_SSID_NAME,
                                 config->ssid));
@@ -165,6 +220,10 @@ bool write_config_to_nvs(config_storage_t *config)
                                 config->poll_time_sec));
     ESP_ERROR_CHECK(nvs_set_str(handle, NVS_URI,
                                 config->uri));
+    ESP_ERROR_CHECK(nvs_set_u32(handle, NVS_IP, config->ipaddr.addr));
+    ESP_ERROR_CHECK(nvs_set_u32(handle, NVS_NETMASK, config->netmask.addr));
+    ESP_ERROR_CHECK(nvs_set_u32(handle, NVS_GATEWAY, config->gateway.addr));
+    ESP_ERROR_CHECK(nvs_set_u32(handle, NVS_DNS, config->dns.addr));
 
     nvs_commit(handle);
 
@@ -186,8 +245,22 @@ bool is_config_valid(config_storage_t *config)
         return false;
     }
 
-    if (strlen(config->pass) == 0) {
-        return false;
+    // cache_ap_info has 2 states, both valid
+
+    // use_dhcp has 2 states, both valid, but if we are not using DHCP, we need
+    // to check other things.
+    if (!config->use_dhcp) {
+        // rudimentary validity check, just make sure it's nonzero.
+        if (config->ipaddr.addr == 0) {
+                return false;
+        }
+
+        if (ip4_addr_netmask_valid(config->netmask.addr) == 0) {
+            return false;
+        }
+        
+        // we don't check gateway or dns because they're not strictly necessary,
+        // so people can leave them blank if they won't ever use them.
     }
 
     if (strlen(config->station_name) == 0) {

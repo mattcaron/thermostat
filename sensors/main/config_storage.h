@@ -15,6 +15,9 @@
 /** Maximum URI length. */
 #define MAX_URI_LEN 512
 
+/** Maximum IPv4 length - 15 chars + nul - "255.255.255.255\0" */
+#define MAX_IPV4_LEN 16
+
 /**
  * Configuration storage structure.
  */
@@ -24,6 +27,11 @@ typedef struct {
     bool cache_ap_info;                     /**< Store the detected WiFi
                                                  access point into to NVS
                                                  memory. */
+    bool use_dhcp;                          /**< Use DHCP. */
+    ip4_addr_t ipaddr;                      /**< IP address. */
+    ip4_addr_t netmask;                     /**< Netmask. */
+    ip4_addr_t gateway;                     /**< Gateway. */
+    ip4_addr_t dns;                         /**< DNS server. */
     char station_name[MAX_STATION_NAME_LEN+1]; /**< The name of this station. */
     bool use_celsius;                       /**< Whether to use Celsius or
                                                  Farenheit */

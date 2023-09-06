@@ -68,6 +68,42 @@ static bool cache_is_valid = false;
  */
 static int s_retry_num = 0;
 
+static void set_static_ip()
+{
+    esp_err_t ret;
+
+    tcpip_adapter_ip_info_t ip;
+    memset(&ip, 0, sizeof(ip));
+    ip.ip.addr = current_config.ipaddr.addr;
+    ip.netmask.addr = current_config.netmask.addr;
+
+    // gateway isn't necessary, but can't be zero, else it never connects.
+    // So, if 0, just set gatway to self so the traffic goes nowhere.
+    if (current_config.gateway.addr == 0) {
+        ip.gw.addr = current_config.ipaddr.addr;
+    }
+    else {
+        ip.gw.addr = current_config.gateway.addr;
+    }
+
+    tcpip_adapter_dns_info_t dns;
+    memset(&dns, 0, sizeof(dns));
+    dns.ip.type = IPADDR_TYPE_V4;
+    dns.ip.u_addr.ip4.addr = current_config.dns.addr;
+
+    ret = tcpip_adapter_dhcpc_stop(TCPIP_ADAPTER_IF_STA);
+    if (ret != ESP_ERR_TCPIP_ADAPTER_DHCP_ALREADY_STOPPED) {
+        ESP_ERROR_CHECK(ret);
+    }
+
+    ESP_ERROR_CHECK(tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_STA, &ip));
+
+    // only set DNS if DNS is nonzero.
+    if (dns.ip.u_addr.ip4.addr != 0) {
+        ESP_ERROR_CHECK(tcpip_adapter_set_dns_info(TCPIP_ADAPTER_IF_STA,TCPIP_ADAPTER_DNS_MAIN, &dns));
+    }
+}
+
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data)
 {
@@ -82,6 +118,11 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         }
 
         ESP_ERROR_CHECK(esp_wifi_connect());
+    }
+    else if (event_base == WIFI_EVENT && 
+             event_id == WIFI_EVENT_STA_CONNECTED &&
+             !current_config.use_dhcp) {
+        set_static_ip();
     }
     else if (event_base == WIFI_EVENT &&
              event_id == WIFI_EVENT_STA_DISCONNECTED) {
