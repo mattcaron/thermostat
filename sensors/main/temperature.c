@@ -45,11 +45,10 @@ static const char *TAG = "temperature";
 #define DS18B20_9BIT_TIME 94
 
 /*
- * Precision and delay selection. Note that we add one to the delay to ensure
- * ample time.
+ * Precision and delay selection.
  */
 #define SENSOR_CONFIG_REG_VALUE DS18B20_12BIT
-#define MEASUREMENT_DELAY_MS DS18B20_12BIT_TIME + 1
+#define MEASUREMENT_DELAY_MS DS18B20_12BIT_TIME
 
 /*
  * Delay in MS after sensor on to wait before doing something. This allows for
@@ -132,12 +131,16 @@ static bool read_temperature(float *temperature)
         ret = ds18x20_measure(SENSOR_GPIO, DS18X20_ANY, false);
         ++count;
     }
+    if (count > 0) {
+        ESP_LOGW(TAG, "It took %d tries to start measurement.", count + 1);
+    }
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Error starting measurement: %s", esp_err_to_name(ret));
     }
     else {
-        // wait for measurement to happen
-        vTaskDelay(MEASUREMENT_DELAY_MS / portTICK_PERIOD_MS);
+        // wait for measurement to happen, adding 1 extra tick just to be
+        // certain we have given ample time.
+        vTaskDelay((MEASUREMENT_DELAY_MS / portTICK_PERIOD_MS) + 1);
 
         // Read it back.
         ret = ds18b20_read_temperature(SENSOR_GPIO, DS18X20_ANY, temperature);
@@ -148,6 +151,9 @@ static bool read_temperature(float *temperature)
             ret = ds18b20_read_temperature(
                       SENSOR_GPIO, DS18X20_ANY, temperature);
             ++count;
+        }
+        if (count > 0) {
+            ESP_LOGW(TAG, "It took %d tries to read the temperature.", count + 1);
         }
         if (ret == ESP_OK) {
             // We have good data, set success.
@@ -243,7 +249,7 @@ float c_to_f(float celsius)
 static void temp_task(void *pvParameters)
 {
     bool comms_success;
-    int retries;
+    int count;
     TickType_t last_wake_time_ticks = xTaskGetTickCount();
     TickType_t next_wake_time_ticks = last_wake_time_ticks +
                                       (current_config.poll_time_sec * 1000) /
@@ -265,12 +271,12 @@ static void temp_task(void *pvParameters)
             vTaskDelay(10000 / portTICK_PERIOD_MS);
         }
 
-        comms_success = false;
-        retries = 5; // prevent infinite tight loop
-
         ESP_LOGW(TAG, "Starting temperature sampling.");
+        now_ticks = xTaskGetTickCount();
 
-        while (!comms_success && retries > 0 ) {
+        comms_success = false;
+        count = 0; // prevent infinite tight loop
+        while (!comms_success && count < 5 ) {
             comms_success = read_temperature(&temp_temp);
             if (comms_success && temp_temp == 85) {
                 /* 85 is the power on reset value and sometimes our call to
@@ -283,8 +289,14 @@ static void temp_task(void *pvParameters)
                 comms_success = false;
                 ESP_LOGW(TAG, "Discarding default reading of 85");
             }
-            --retries;
+            ++count;
         }
+        if (count > 1) {
+            ESP_LOGW(TAG, "It took %d tries to read temperature.", count + 1);
+        }
+
+        ESP_LOGW(TAG, "Temperature acquisition took %dms.",
+            (xTaskGetTickCount() - now_ticks) * portTICK_PERIOD_MS);
 
         ESP_LOGI(TAG, "Waiting for WiFi");
         // Wait for wifi to be up before sending our message
