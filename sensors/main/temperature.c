@@ -53,8 +53,11 @@ static const char *TAG = "temperature";
 /*
  * Delay in MS after sensor on to wait before doing something. This allows for
  * power to settle, capacitors to charge, etc.
+ *
+ * Note that anything less than 10 does nothing because portTICK_PERIOD_MS is
+ * 10.
  */
-#define SENSOR_ON_DELAY_MS 1
+#define SENSOR_ON_DELAY_MS 10
 
 /*
  * If we are running the DS18B20 in its default mode (12 bit resolution), we
