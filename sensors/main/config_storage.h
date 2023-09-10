@@ -15,8 +15,11 @@
 /** Maximum URI length. */
 #define MAX_URI_LEN 512
 
-/** Maximum IPv4 length - 15 chars + nul - "255.255.255.255\0" */
+/** Maximum IPv4 string length - 15 chars + nul - "255.255.255.255\0" */
 #define MAX_IPV4_LEN 16
+
+/** MAC address length in bytes (not the string) */
+#define MAC_ADDR_LEN 6
 
 /**
  * Configuration storage structure.
