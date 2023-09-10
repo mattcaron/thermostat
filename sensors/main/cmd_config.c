@@ -211,9 +211,8 @@ static void emit_set_help(void)
            "        Note: This is used for the both the DHCP client name and\n"
            "        is sent as part of the CoAP payload, so format it\n"
            "        accordingly. An invalid format will result in a failure\n"
-           "        to set the hostname.",
+           "        to set the hostname (only 0-9, a-z, . and - (but not at the end)).\n",
            MAX_STATION_NAME_LEN);
-    printf("        Note: surround the name with quotes if you use spaces.\n");
     printf("    " CONFIG_SET_TEMP_UNIT
            " = the temp unit used by this unit (C or F)\n");
     printf("    " CONFIG_SET_POLL_INTERVAL
@@ -224,7 +223,7 @@ static void emit_set_help(void)
     printf("    " CONFIG_SET_URI
            " = URI (%d char max).\n"
            "        Note: This should be of the form:\n"
-           "coap://host/url\n", MAX_URI_LEN);
+           "              coap://host/url\n", MAX_URI_LEN);
     printf("\n");
 }
 
