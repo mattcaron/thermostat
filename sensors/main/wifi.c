@@ -450,6 +450,7 @@ static bool coap_send_temperature(void)
     coap_pdu_t *request = NULL;
     bool success = false;
     int result;
+    EventBits_t bits;
 
     if (!parse_coap_server(&uri)) {
         ESP_LOGE(TAG, "parse_coap_server failed");
@@ -526,9 +527,15 @@ static bool coap_send_temperature(void)
                             ESP_LOGI(TAG, "sending the COAP message took %d ms", result);
                         }
 
+                        bits = xEventGroupWaitBits(
+                                wifi_status,
+                                COAP_SUCCESSFUL,
+                                pdFALSE,
+                                pdFALSE,
+                                COAP_TIMEOUT_S * 1000 / portTICK_PERIOD_MS);
                         // success is only true if we got a successful return
                         // code
-                        if (xEventGroupGetBits(wifi_status) & COAP_SUCCESSFUL) {
+                        if (bits & COAP_SUCCESSFUL) {
                             success = true;
                         }
                     }
