@@ -56,8 +56,11 @@ static EventGroupHandle_t wifi_status;
 
 #define WIFI_MAXIMUM_RETRIES 3  /**< Maximum connection retries. */
 
-#define COAP_TIMEOUT_S 5        /**< Maximum time to wait for a successful
-                                     reply from the CoAP server. */
+#define COAP_TIMEOUT_MS 500        /**< Maximum time to wait for a successful
+                                        reply from the CoAP server for a single send. */
+#define COAP_SEND_TIMEOUT_S 5      /**< Maximum overall time to wait for COAP
+                                        to be idle (including retries). This is an effective bound on the maximum wake time of the sensor - it will (maximally) be awake for this long plus the time it takes to connect to WiFi (which is always longer than the time it gets the temperature). */
+#define COAP_RETRIES (COAP_SEND_TIMEOUT_S * 1000 / COAP_TIMEOUT_MS)
 
 static const char *TAG = "WiFi";
 
@@ -451,6 +454,7 @@ static bool coap_send_temperature(void)
     bool success = false;
     int result;
     EventBits_t bits;
+    int send_attempts = 0;
 
     if (!parse_coap_server(&uri)) {
         ESP_LOGE(TAG, "parse_coap_server failed");
@@ -473,76 +477,80 @@ static bool coap_send_temperature(void)
             ESP_LOGE(TAG, "getaddrinfo failed: %d", result);
         }
         else {
-            ctx = coap_new_context(NULL);
-            if (!ctx) {
-                ESP_LOGE(TAG, "coap_new_context() failed");
-            } else {
-                coap_address_init(&dst_addr);
-                dst_addr.size = ainfo->ai_addrlen;
-                memcpy(&dst_addr.addr, ainfo->ai_addr, ainfo->ai_addrlen);
-                if (ainfo->ai_family == AF_INET6) {
-                    dst_addr.addr.sin6.sin6_family = AF_INET6;
-                    dst_addr.addr.sin6.sin6_port   = htons(uri.port);
+            while (send_attempts < COAP_RETRIES && !success) {
+                ++send_attempts;
+
+                ctx = coap_new_context(NULL);
+                if (!ctx) {
+                    ESP_LOGE(TAG, "coap_new_context() failed");
                 } else {
-                    dst_addr.addr.sin.sin_family   = AF_INET;
-                    dst_addr.addr.sin.sin_port     = htons(uri.port);
-                }
+                    coap_address_init(&dst_addr);
+                    dst_addr.size = ainfo->ai_addrlen;
+                    memcpy(&dst_addr.addr, ainfo->ai_addr, ainfo->ai_addrlen);
+                    if (ainfo->ai_family == AF_INET6) {
+                        dst_addr.addr.sin6.sin6_family = AF_INET6;
+                        dst_addr.addr.sin6.sin6_port   = htons(uri.port);
+                    } else {
+                        dst_addr.addr.sin.sin_family   = AF_INET;
+                        dst_addr.addr.sin.sin_port     = htons(uri.port);
+                    }
 
-                session = coap_new_client_session(ctx, NULL, &dst_addr,
-                    uri.scheme==COAP_URI_SCHEME_COAP_TCP ? COAP_PROTO_TCP :
-                    uri.scheme==COAP_URI_SCHEME_COAPS_TCP ? COAP_PROTO_TLS :
-                    uri.scheme==COAP_URI_SCHEME_COAPS ? COAP_PROTO_DTLS : COAP_PROTO_UDP);
-                if (!session) {
-                    ESP_LOGE(TAG, "coap_new_client_session() failed");
-                }
-                else {
-                    coap_register_response_handler(ctx, coap_message_handler);
-
-                    request = coap_new_pdu(session);
-                    if (!request) {
-                        ESP_LOGE(TAG, "coap_new_pdu() failed");
+                    session = coap_new_client_session(ctx, NULL, &dst_addr,
+                        uri.scheme==COAP_URI_SCHEME_COAP_TCP ? COAP_PROTO_TCP :
+                        uri.scheme==COAP_URI_SCHEME_COAPS_TCP ? COAP_PROTO_TLS :
+                        uri.scheme==COAP_URI_SCHEME_COAPS ? COAP_PROTO_DTLS : COAP_PROTO_UDP);
+                    if (!session) {
+                        ESP_LOGE(TAG, "coap_new_client_session() failed");
                     }
                     else {
-                        request->type = COAP_MESSAGE_CON;
-                        request->tid = coap_new_message_id(session);
-                        request->code = COAP_REQUEST_PUT;
+                        coap_register_response_handler(ctx, coap_message_handler);
 
-                        coap_add_option(request, COAP_OPTION_URI_PATH,
-                                        uri.path.length, uri.path.s);
-                        
-                        coap_add_data(request, strlen(buffer), (uint8_t *)buffer);
-
-                        xEventGroupClearBits(wifi_status, COAP_SUCCESSFUL|COAP_QUEUE_EMPTY);
-
-                        // coap_send deletes the request when finished
-                        coap_send(session, request);
-
-                        // this runs the coap network I/O; return value is how
-                        // long it took, or -1 if error.
-                        result = coap_run_once(ctx, COAP_TIMEOUT_S * 1000);
-                        if (result < 0) {
-                            ESP_LOGE(TAG, "coap_run_once returned %d", result);
+                        request = coap_new_pdu(session);
+                        if (!request) {
+                            ESP_LOGE(TAG, "coap_new_pdu() failed");
                         }
                         else {
-                            ESP_LOGI(TAG, "sending the COAP message took %d ms", result);
+                            request->type = COAP_MESSAGE_CON;
+                            request->tid = coap_new_message_id(session);
+                            request->code = COAP_REQUEST_PUT;
+
+                            coap_add_option(request, COAP_OPTION_URI_PATH,
+                                            uri.path.length, uri.path.s);
+                            
+                            coap_add_data(request, strlen(buffer), (uint8_t *)buffer);
+
+                            xEventGroupClearBits(wifi_status, COAP_SUCCESSFUL|COAP_QUEUE_EMPTY);
+
+                            // coap_send deletes the request when finished
+                            coap_send(session, request);
+
+                            // this runs the coap network I/O; return value is how
+                            // long it took, or -1 if error.
+                            result = coap_run_once(ctx, COAP_TIMEOUT_MS);
+                            if (result < 0) {
+                                ESP_LOGE(TAG, "coap_run_once returned %d", result);
+                            }
+                            else {
+                                ESP_LOGW(TAG, "sending the COAP message took %d ms", result);
+                            }
+
+                            bits = xEventGroupWaitBits(
+                                    wifi_status,
+                                    COAP_SUCCESSFUL,
+                                    pdFALSE,
+                                    pdFALSE,
+                                    COAP_TIMEOUT_MS / portTICK_PERIOD_MS);
+                            // success is only true if we got a successful return
+                            // code
+                            if (bits & COAP_SUCCESSFUL) {
+                                success = true;
+                            }
                         }
 
-                        bits = xEventGroupWaitBits(
-                                wifi_status,
-                                COAP_SUCCESSFUL,
-                                pdFALSE,
-                                pdFALSE,
-                                COAP_TIMEOUT_S * 1000 / portTICK_PERIOD_MS);
-                        // success is only true if we got a successful return
-                        // code
-                        if (bits & COAP_SUCCESSFUL) {
-                            success = true;
-                        }
+                        coap_session_release(session);
                     }
-
-                    coap_session_release(session);
+                    coap_free_context(ctx);            
                 }
-                coap_free_context(ctx);            
             }
         }
 
@@ -697,7 +705,7 @@ bool wait_for_sending_complete(void)
              COAP_QUEUE_EMPTY,
              pdFALSE,
              pdFALSE,
-             COAP_TIMEOUT_S * 1000 / portTICK_PERIOD_MS);
+             COAP_SEND_TIMEOUT_S * 1000 / portTICK_PERIOD_MS);
  
     if (bits & COAP_QUEUE_EMPTY) {
         // bit set

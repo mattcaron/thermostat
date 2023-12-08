@@ -316,6 +316,7 @@ static void temp_task(void *pvParameters)
                 }
 
                 // We've read our temperature, wake up our WiFi task to send it.
+                // This is nonblocking., so we have to wait below.
                 wifi_send_temperature();
             }
             else {
