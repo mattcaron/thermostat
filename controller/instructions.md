@@ -21,48 +21,6 @@ Assuming one is starting with a Raspberry Pi 3 or similar...
 1. Set it up however else you like. For example, I disabled wifi to save power
    and because I intend to just use it wired.
 
-1. Install the various packages that we'll need:
-
-       sudo apt install mosquitto
-
-1. Configure mosquitto, the MQTT broker to which the sensors will send messages.
-
-    1. Add a user to receive messages. Note that one can use the same user for
-       all stations if one desires:
-
-           sudo mosquitto_passwd -c /etc/mosquitto/passwd <user>
-
-    1. Grab the example config file and gunzip it.
-
-           cd /etc/mosquitto/conf.d/.
-           sudo cp /usr/share/doc/mosquitto/examples/mosquitto.conf.gz .
-           sudo gunzip mosquitto.conf.gz
-
-    1. Edit `/etc/mosquitto/conf.d/mosquitto.conf` via your favorite method and
-       go through it setting config values appropriately. It is very well
-       documented in the example and most of the values are fine at their
-       defaults. I note that I only set up the default listener, and set up the following:
-
-           port 8883
-           cafile /etc/mosquitto/certs/ca.crt
-           certfile /etc/mosquitto/certs/crt              
-           keyfile /etc/mosquitto/certs/key 
-           password_file /etc/mosquitto/passwd
-
-    1. Set up certs
-
-       1. Generate certs/keys/chain files/etc. via your favorite method.
-       1. Put them in `/etc/mosquitto/certs`
-       1. Make sure that they are owned:growned by `mosquitto:mosquitto`.
-       1. And that they're group readable:
-
-              sudo chmod g+r /etc/mosquitto/certs/* 
-
-       1. At that the user `alice` is in the `mosquitto` group so NodeRed (which
-          runs as `alice`) can read them.
-
-              sudo usermod -a -G mosquitto alice
-
 1. Set up NodeRED / Apache / etc.
 
    1. Install necessary dependencies:
@@ -158,6 +116,7 @@ Assuming one is starting with a Raspberry Pi 3 or similar...
              npm install node-red-dashboard
              npm install node-red-contrib-flogger
              npm install node-red-node-email
+             npm install node-red-contrib-coap
 
    1. Once that's all done, you'll need to restart nodered:
 
