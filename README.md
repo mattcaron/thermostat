@@ -29,7 +29,7 @@ This will get this repo and all the submodules uses (such as the Espressif repos
 ### Thermometer puck sensors
 
 This is intended to be pretty turnkey. Build it, flash it, configure it,
-stick it on the wall. It will send MQTT messages to your broker (see below)
+stick it on the wall. It will send COAP messages to your server (see below)
 which you then consume in NodeRED (also below) and make it do what you want.
 
 **Status:** In progress. See the `sensors` subdirectory.
@@ -37,14 +37,15 @@ which you then consume in NodeRED (also below) and make it do what you want.
 **Roadmap:**
 
 1. Hardware selection: Completed
-1. Firmware: Done (v1.0.0)
+1. Firmware: Done (v2.0.0)
    1. Console: Done
    1. Config: Done
    1. OneWire to DS18B20: Done
    1. WiFi refactor: Done
-   1. MQTT: Done
+   1. ~~MQTT: Done~~
+      1. Replace with COAP: Done
    1. Power saving deep sleep: Done
-1. Wiring diagram: Not started
+1. Wiring diagram: Not started (still)
 1. Case design: Completed
 
 **TODO:**
@@ -106,9 +107,11 @@ Example links are provided for clarity, in cases where the hardware is uncommon.
 
 You will need one of each of these items for each "puck".
 
-1. NodeMCU Wireless Mini D1 ESP-12F Board
-   * Either v2 or v3 should work fine.
-   * https://www.amazon.com/dp/B073CQVFLK
+1. LOLIN D1 Mini Board
+   * I had used a knockoff board for the previous generation, but the LDO
+     regulator used was complete garbage (quiescent current measured in
+     milliAmps, not microAmps) and that led to dramatically reduced battery life.
+   * <https://www.wemos.cc/en/latest/d1/d1_mini.html>
 1. 3 AAA battery holder with leads
    * https://www.amazon.com/gp/product/B0156V1JGQ
 1. DS18B20 - Get the actual Maxim one.
@@ -198,12 +201,14 @@ drop logic blocks, with the ability to program custom logic blocks in
 JavaScript. As such, it should be pretty approachable to the novice
 programmer.
 
-**Status:** Not started
+**Status:** Done
 
 1. Hardware selection: Completed, needs schematic.
-1. Firmware: Not started.
-  1. RPi base uses RPiOS + NodeRed + Mosquitto MQTT broker
-  1. Firmware will be a NodeRed program; example will be provided.
+1. Enclosure: Done. It's slotted for a slide-in cover. I plan to make one out of
+   clear acrylic, just a simple score and snap.
+1. Firmware: Done
+   1. RPi base uses RPiOS + NodeRed + some plugins
+   1. Firmware is a NodeRed program - see `controller/controller.json`.
 
 #### BOM
 
@@ -258,7 +263,26 @@ Example links are provided for clarity, in cases where the hardware is uncommon.
 
 1. Stranded wire for connecting screw terminals to relays.
 1. Tools - strippers, small screwdrivers, etc.
-1. Some lengths of furnace wire for connecting to HVAC equipment or a zone controller.
+1. Some lengths of furnace wire for connecting to HVAC equipment or a zone
+   controller.
+
+## Battery notes
+
+1. As mentioned above, use a board with a good LDO regulator. We already put the
+   board into deep sleep, but the power regulator consumes power at idle and the
+   less it consumes, the longer the battery will last.
+2. Enable access point caching (`config set cache_ap Y`). This will cut down the
+   amount of time it takes to wake from deep sleep and get wifi up, saving time
+   and power. If it fails to associate with the last AP, it will fall back to
+   the standard process.
+3. Disable DHCP (`config set use_dhcp N`) and then set a static IP and netmask
+   (`config set ip_addr XXX.XXX.XXX.XXX` `config set netmask YYY.YYY.YYY.YYY`).
+   This will save several exchanges over WiFi, and those tend to consume a lot
+   of power (especially while transmitting). Also saves several seconds of runtime.
+4. Use the static IP of your base station in the coap URL (`config set uri
+   coap://ZZZ.ZZZ.ZZZ.ZZZ/whatever`). This saves a DNS lookup which, again,
+   takes time and power. Note that this only works **if you know it won't
+   change**. If it might change, use its hostname.
 
 ## Security notes
 
@@ -269,25 +293,17 @@ funeral.
 
 ### SSL
 
-#### Sensor
+#### Sensor (COAP+DTLS)
 
-The default sensor firmware does not do CA certificate verification on the cert
-presented by the MQTT server. This is because the common case for this
-application is nodes in one's house talking to a controller via a private
-network with an internal, private DNS. As a result, it is most likely that a
-self signed certificate is in use here, especially since even a minimally
-verified certificate such as LetsEncrypt won't work because it can't even do a
-basic DNS lookup on the MQTT broker. Having that selfsigned cert be validated
-would require the user to recompile the firmware with the CA cert used to sign
-the server key built in. This is definitely possible, and any users who wish to
-do such a thing can figure it out (look at
-`examples/protocols/mqtt/ssl/main/app_main.c` and the initialization of
-`mqtt_cfg` in `mqtt_start` in `main/wifi.c`). However, I'm not going to bother
-with it, as even using SSL is barely commensurate with the level of risk
-presented here - especially when one takes into account using a secured WiFi
-network. We're at 2 levels of encryption and credentials, and I'm not going lose
-any sleep over the fact that the second layer of encryption is not as strong as
-it could be.
+Not yet implemented, and should be. The problem is, `node-red-contrib-coap`
+doesn't support DTLS, so I need to implement some sort of proxy. Big TODO that I
+actually intend to do... but haven't.
+
+In the interim, throwing a slug on the end of the target COAP URL so people
+can't poison your sensor data may help. It's a little security by obscurity, but
+better than nothing. I added a -12345 in my example. I know, I know, it's the
+kind of thing an idiot would have on his luggage, but it's not what I'm actually
+using in production.
 
 #### NodeRED / Webserver
 
@@ -319,6 +335,14 @@ Take your best guess.
 ### **But, half the links are to Amazon!**
 
 Yeah, I'm a hypocrite too, what's your point?
+
+### **How long is the battery life?**
+
+In v1, it was about a month. This was using the old MQTT implementation, DHCP,
+not caching the AP, and connecting to the base via hostname.
+
+In v2, using COAP and all the techniques listed up in "Battery notes", I'm on 2
+months and counting (I'll update this once one actually runs out).
 
 ## Acknowledgements
 
