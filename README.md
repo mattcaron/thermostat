@@ -108,28 +108,28 @@ Example links are provided for clarity, in cases where the hardware is uncommon.
 You will need one of each of these items for each "puck".
 
 1. LOLIN D1 Mini Board
-   * I had used a knockoff board for the previous generation, but the LDO
+   - I had used a knockoff board for the previous generation, but the LDO
      regulator used was complete garbage (quiescent current measured in
      milliAmps, not microAmps) and that led to dramatically reduced battery life.
-   * <https://www.wemos.cc/en/latest/d1/d1_mini.html>
+   - <https://www.wemos.cc/en/latest/d1/d1_mini.html>
 1. 3 AAA battery holder with leads
-   * https://www.amazon.com/gp/product/B0156V1JGQ
+   - <https://www.amazon.com/gp/product/B0156V1JGQ>
 1. DS18B20 - Get the actual Maxim one.
-   * I used the genuine article here, because I tried a couple of knockoffs and
+   - I used the genuine article here, because I tried a couple of knockoffs and
     they lacked the ability to save configuration and were less precise than the
     actual Maxim product.
-      * The above is accurate, but if you run it at 12 bit resolution (the
+      - The above is accurate, but if you run it at 12 bit resolution (the
         default), it doesn't matter, and a generic knockoff will probably work
         fine. Your mileage may vary. See `sensors/main/temperature.c` and set
         `SENSOR_CONFIG_REG_VALUE` and `MEASUREMENT_DELAY_MS` accordingly.
-   * https://www.mouser.com/ProductDetail/?qs=7H2Jq%252ByxpJKpIDCbiq4lfg%3D%3D
+   - <https://www.mouser.com/ProductDetail/?qs=7H2Jq%252ByxpJKpIDCbiq4lfg%3D%3D>
 1. Wire of appropriate gauge - one spool each of red and black (for power and
    ground) and another for signal (orange, yellow, blue, etc.) in 22 AWD should
    work fine here.
 1. Heat shrink tubing for the above - you're going to be soldering to the ends
    of the DS18B20 sensor and you'll want to heat shrink over them to ensure you
    don't get any shorts.
-   * Alternatively, if you want to do slightly less soldering, you could find a
+   - Alternatively, if you want to do slightly less soldering, you could find a
      3 pin pigtail lead with breadboard (2.54mm) pin spacing, plug the DS18B20's
      into the plug end and solder the other end to the ESP board. But, wire is
      cheaper and I rather enjoy soldering - it lets me catch up on my Oak
@@ -217,46 +217,47 @@ Example links are provided for clarity, in cases where the hardware is uncommon.
 ##### Hardware list
 
 1. Raspberry Pi 3B+
-   * RPi4 would likely work with minimal modification to these
+   - RPi4 would likely work with minimal modification to these
    instructions.
-1. SD card 
-   * 32GB is fine.
+1. SD card
+   - 32GB is fine.
 1. RPi screw terminal expansion board with status LEDs
-   * https://www.amazon.com/GeeekPi-Raspberry-Terminal-Breakout-Expansion/dp/B08GKSF1MD
-   * Not strictly necessary, as one can just wire directly to the header block,
+   - <https://www.amazon.com/GeeekPi-Raspberry-Terminal-Breakout-Expansion/dp/B08GKSF1MD>
+   - Not strictly necessary, as one can just wire directly to the header block,
      but screw terminals ensure positive connections that won't pull out on you.
 1. Some solid state relay modules
-   * I bought one of
-     https://www.amazon.com/SainSmart-Channel-Duemilanove-MEGA2560-MEGA1280/dp/B00ZZVQR5Q
+   - I bought one of
+     <https://www.amazon.com/SainSmart-Channel-Duemilanove-MEGA2560-MEGA1280/dp/B00ZZVQR5Q>
      for each of my zones.
-   * You can get ones with more or fewer relays as needed.
-   * Note that you will need at least 3 for a common setup:
-     * Fan
-     * Cooling
-     * Heating
+   - You can get ones with more or fewer relays as needed.
+   - Note that you will need at least 3 for a common setup:
+     - Fan
+     - Cooling
+     - Heating
 
      More advanced setups (for example, multistage heating and cooling) will
      require more contacts.
-   * You can use mechanical relays if you like, as they are cheaper. However,
+   - You can use mechanical relays if you like, as they are cheaper. However,
      they draw more current and will (eventually) mechanically wear out. The RPi
      3B+ GPIOs are spec-ed at max 16mA per channel, with 50mA aggregate.
-       * This article from arrow explains it well:
-         https://www.arrow.com/en/research-and-events/articles/crydom-solid-state-relays-vs-electromechanical-relays
-       * Using some commonly available numbers as an example, the stated typical
+       - This article from arrow explains it well:
+         <https://www.arrow.com/en/research-and-events/articles/crydom-solid-state-relays-vs-electromechanical-relays>
+       - Using some commonly available numbers as an example, the stated typical
          current draw for a commonly used electromechanical relay was 70mA,
          wheras it was 10mA for the SSR (though in both cases, actual measured
          current draw in situ was about an order of magnitude less).
-   * Note that there is a bit of a cheat here - I assume that only one contact
+   - Note that there is a bit of a cheat here - I assume that only one contact
      will be closed at any given time per zone - that is, only one of fan, heat,
      or cool. If this is not true, and you have enough zones, you can exceed the
      overall current rating for the board. For example, if we turn on fan and
      heat for 3 zones at the stated 10mA power consumption, we will end up at
      60mA, which is more than the allowed aggregate across all GPIO contacts.
-  * 24VAC to 5V buck converter
-    * I used
-      https://www.amazon.com/SMAKN%C2%AE-Converter-Voltage-Supply-Waterproof/dp/B00RE6QN4U
+
+- 24VAC to 5V buck converter
+  - I used
+      <https://www.amazon.com/SMAKN%C2%AE-Converter-Voltage-Supply-Waterproof/dp/B00RE6QN4U>
       soldered to the power and ground pins of a USB wire.
-    * The logic here is that we can power it from the 24VAC that's readily
+  - The logic here is that we can power it from the 24VAC that's readily
       available at the equipment and won't have to use an additional power brick.
 
 ##### Misc supplies and equipment
@@ -308,7 +309,7 @@ using in production.
 #### NodeRED / Webserver
 
 This is just using the default selfsigned cert that's generated when Apache is
-installed. 
+installed.
 
 ## License
 
