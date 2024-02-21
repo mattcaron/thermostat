@@ -206,9 +206,23 @@ programmer.
 
 **Status:** Done
 
-1. Hardware selection: Completed, needs schematic.
-1. Enclosure: Done. It's slotted for a slide-in cover. I plan to make one out of
+1. Hardware selection: Completed, see below.
+   - I'm not going to do a schematic for this because it's very application
+     specific.
+   - In short:
+     1. Get an RPi
+     1. Get an appropriate number of relay boards.
+     1. Wire them all together.
+     1. Connect your HVAC kit.
+     1. Write a NodeRed program to control it all.
+1. Enclosure: Done.
+   - It's slotted for a slide-in cover. I plan to make one out of
    clear acrylic, just a simple score and snap.
+   - See `./enclosures/controller_base.stl` for a render.
+   - This is generated from
+     [./enclosures/controller_base.scad](./enclosures/controller_base.scad),
+     which will almost certainly require modification unless your set up is
+     exactly the same as mine.
 1. Firmware: Done
    1. RPi base uses RPiOS + NodeRed + some plugins
    1. Firmware is a NodeRed program - see `controller/controller.json`.
