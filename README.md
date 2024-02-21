@@ -342,8 +342,11 @@ Yeah, I'm a hypocrite too, what's your point?
 In v1, it was about a month. This was using the old MQTT implementation, DHCP,
 not caching the AP, and connecting to the base via hostname.
 
-In v2, using COAP and all the techniques listed up in "Battery notes", I'm on 2
-months and counting (I'll update this once one actually runs out).
+In v2, using COAP and all the techniques listed up in "Battery notes", a set of
+3 2000mAh batteries last about 2.5 months. 2400mAh batteries push you over 3
+months. Note that these need to *actually* be performing at their rated
+capacities - I've gotten a lot of batteries that said 2400 or higher on the
+nameplate, and they only test out to about 2000mAh.
 
 ## Acknowledgements
 
