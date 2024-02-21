@@ -45,8 +45,11 @@ which you then consume in NodeRED (also below) and make it do what you want.
    1. ~~MQTT: Done~~
       1. Replace with COAP: Done
    1. Power saving deep sleep: Done
-1. Wiring diagram: Not started (still)
-1. Case design: Completed
+1. Wiring diagram: Done
+   - See [./sensors/wiring_instructions/wiring_instructions.md](./sensors/wiring_instructions/wiring_instructions.md)
+1. Case design: Done
+   - See `./enclosures/sensor*.stl`
+   - These are generated from [./enclosures/sensor_puck.scad](./enclosures/sensor_puck.scad)
 
 **TODO:**
 
