@@ -135,7 +135,7 @@ Assuming one is starting with a Raspberry Pi 3 or similar...
              dtoverlay w1-gpio gpiopin=14 pullup=0
 
       1. The device will be something like `/sys/bus/w1/devices/28-012062f7a914`
-         - you'll need to look around and find it, each has a different ID.
+         * you'll need to look around and find it, each has a different ID.
 
       1. Add bc to make it easier to do math from the CLI
 
@@ -149,6 +149,53 @@ Assuming one is starting with a Raspberry Pi 3 or similar...
 
              temp_c=`cat /sys/bus/w1/devices/28-012062f7a914/temperature`
              echo "scale=1; $temp_c/1000*1.8 + 32" | bc
+
+   1. Set up system email forwarding (assuming you want to get emails from the
+      watchdog when it reboots the system):
+
+      1. Install it:
+
+             sudo apt install ssmtp
+
+      1. And then configure `/etc/ssmtp/ssmtp.conf` appropriately.
+
+   1. Enable the watchdog timer.
+
+      This is so that, if the hardware locks up, it will get rebooted.
+
+      1. Enable it in the devicetree.
+         1. Edit `/boot/config.txt`
+         1. Find the `dtparam` lines that enable `spi` and `i2c`.
+         1. Add the following line:
+
+                dtparam=watchdog=on
+
+      1. Install the `watchdog` package:
+
+             sudo apt install watchdog
+
+      1. Configure it:
+         1. Edit `/etc/watchdog.conf`
+         1. Uncomment the following lines:
+
+                watchdog-device         = /dev/watchdog
+                max-load-1              = 24
+                max-load-5              = 18
+                max-load-15             = 12
+                min-memory              = 1
+                allocatable-memory      = 1
+
+         1. And this one needs to be uncommented and changed:
+
+                watchdog-timeout        = 15
+
+         1. The rest should be fine at the defaults.
+
+      1. Enable it:
+
+             sudo systemctl enable watchdog
+
+      1. Reboot
 
 1. Make sure to give it either a static IP or a static DHCP lease and add that
    IP to your local network DNS lookup. The reason here is that the sensors need
