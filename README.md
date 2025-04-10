@@ -32,7 +32,7 @@ This is intended to be pretty turnkey. Build it, flash it, configure it,
 stick it on the wall. It will send COAP messages to your server (see below)
 which you then consume in NodeRED (also below) and make it do what you want.
 
-**Status:** In progress. See the `sensors` subdirectory.
+**Status:** Completed, apart from TODOs. See the `sensors` subdirectory.
 
 **Roadmap:**
 
