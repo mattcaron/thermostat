@@ -115,7 +115,7 @@ You will need one of each of these items for each "puck".
      regulator used was complete garbage (quiescent current measured in
      milliAmps, not microAmps) and that led to dramatically reduced battery life.
    - <https://www.wemos.cc/en/latest/d1/d1_mini.html>
-1. 3 AAA battery holder with leads
+1. 3 AA battery holder with leads
    - <https://www.amazon.com/gp/product/B0156V1JGQ>
 1. DS18B20 - Get the actual Maxim one.
    - I used the genuine article here, because I tried a couple of knockoffs and
