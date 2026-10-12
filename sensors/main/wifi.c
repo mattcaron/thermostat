@@ -64,8 +64,6 @@ static EventGroupHandle_t wifi_status;
 
 static const char *TAG = "WiFi";
 
-static bool cache_is_valid = false;
-
 /**
  * Counter for the number of wifi retries so far
  */
@@ -242,6 +240,7 @@ static void connect_wifi(void)
 {
     wifi_config_t wifi_config = {0};
     wifi_ap_record_t ap_info = {0};
+    bool cache_is_valid = false;
 
     xEventGroupClearBits(wifi_status, WIFI_OFF);
 
