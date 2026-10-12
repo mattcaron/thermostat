@@ -230,7 +230,6 @@ static void wifi_deinit(void)
     ESP_ERROR_CHECK(esp_wifi_deinit());
     ESP_ERROR_CHECK(esp_event_loop_delete_default());
     ESP_ERROR_CHECK(esp_netif_deinit());
-    vEventGroupDelete(s_wifi_event_group);
 }
 #endif
 
