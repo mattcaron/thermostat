@@ -355,12 +355,20 @@ static void disconnect_wifi(void)
 
     if (status & WIFI_CONNECTED) {
         ESP_ERROR_CHECK(esp_wifi_disconnect());
+        ESP_LOGI(TAG, "WiFi disconnected.");
+    }
+    else {
+        ESP_LOGI(TAG, "WiFi not connected, not disconnecting.");
     }
     if (status & WIFI_STARTED) {
         ESP_ERROR_CHECK(esp_wifi_stop());
+        ESP_LOGI(TAG, "WiFi stopped.");
         // We don't deinit the WiFi, because it's not necessary - the config is
         // set in connect_wifi, right before esp_wifi_start.
         xEventGroupClearBits(wifi_status, WIFI_STARTED);
+    }
+    else {
+        ESP_LOGI(TAG, "WiFi not started, so not stopping.");
     }
 
     // WiFi is now off.
