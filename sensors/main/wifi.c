@@ -296,21 +296,20 @@ static void connect_wifi(void)
         ESP_LOGI(TAG, "connected to SSID: %s", wifi_config.sta.ssid);
         // We are now connected to WiFi.
         // If we're supposed to cache info and the cache isn't currently valid,
-        // write it and set the cache to valid.
+        // write it out so we now have valid data in the cache.
         if (current_config.cache_ap_info && !cache_is_valid) {
             ESP_ERROR_CHECK(esp_wifi_sta_get_ap_info(&ap_info));
             ap_cache.channel = ap_info.primary; // primary channel
             memcpy(ap_cache.bssid, ap_info.bssid, sizeof(ap_cache.bssid));
 
             if (write_ap_cache_to_nvs()) {
-                cache_is_valid = true;
                 ESP_LOGI(TAG, "Saved AP info to cache.");
             }
             else {
                 ESP_LOGE(TAG, "Failed to save AP info to cache.");
             }
         }
-}
+    }
     else if (status & WIFI_FAIL) {
         ESP_LOGI(TAG, "Failed to connect to SSID: %s", wifi_config.sta.ssid);
         // We don't need to clear the connected bit, because it's cleared when
@@ -320,10 +319,14 @@ static void connect_wifi(void)
         xEventGroupClearBits(wifi_status, WIFI_FAIL);
 
         if (current_config.cache_ap_info && cache_is_valid) {
-            // If the we failed to connect, then assume our cache is now invalid
-            // because we tried to connect to an AP that didn't exist, so any
-            // information is obsolete.
-            cache_is_valid = false;
+            // If the we failed to connect, then assume our cache is
+            // now invalid, so delete it.
+            if (delete_ap_cache_from_nvs()) {
+                ESP_LOGI(TAG, "Deleted AP info from cache.");
+            }
+            else {
+                ESP_LOGE(TAG, "Failed to delete info from cache.");
+            }
 
             // and, if we were relying on the cached data, then post a message
             // to the queue to try again - which will just kick is back into
