@@ -241,8 +241,8 @@ static void wifi_deinit(void)
  */
 static void connect_wifi(void)
 {
-    wifi_config_t wifi_config = {};
-    wifi_ap_record_t ap_info = {};
+    wifi_config_t wifi_config = {0};
+    wifi_ap_record_t ap_info = {0};
 
     xEventGroupClearBits(wifi_status, WIFI_OFF);
 

@@ -183,7 +183,7 @@ static bool read_temperature(float *temperature)
 static bool check_and_fix_18b20_configuration(void)
 {
     // scratchpad holds 8 bytes of data
-    uint8_t scratchpad[8] = {};
+    uint8_t scratchpad[8] = {0};
 
     bool success = false;
     int count = 0;
