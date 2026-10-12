@@ -75,3 +75,24 @@ bool write_ap_cache_to_nvs(void)
 
     return success;
 }
+
+bool delete_ap_cache_from_nvs(void)
+{
+    nvs_handle handle;
+    bool success = false;
+
+    if(nvs_open(NVS_CACHE_NAMESPACE, NVS_READWRITE, &handle) == ESP_OK) {
+        // Erace our config items.
+        if(nvs_erase_key(handle, NVS_CHANNEL_NAME) == ESP_OK &&
+           nvs_erase_key(handle, NVS_BSSID_NAME) == ESP_OK) {
+            
+            if(nvs_commit(handle) == ESP_OK) {
+                success = true;
+            } // else nvs_commit failed
+        } // else nvs_erase_key failed
+    
+        nvs_close(handle);
+    } // else nvs_open failed
+
+    return success;
+}

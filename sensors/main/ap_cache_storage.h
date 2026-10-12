@@ -35,4 +35,12 @@ bool read_ap_cache_from_nvs(void);
  */
 bool write_ap_cache_to_nvs(void);
 
+/**
+ * Erase AP cache from NVS.
+ *
+ * @return true on success.
+ * @return false on failure.
+ */
+bool delete_ap_cache_from_nvs(void);
+
 #endif // __AP_CACHE_STORAGE_H_
