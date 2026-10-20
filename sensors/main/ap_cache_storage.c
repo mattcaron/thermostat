@@ -82,7 +82,7 @@ bool delete_ap_cache_from_nvs(void)
     bool success = false;
 
     if(nvs_open(NVS_CACHE_NAMESPACE, NVS_READWRITE, &handle) == ESP_OK) {
-        // Erace our config items.
+        // Erase our config items.
         if(nvs_erase_key(handle, NVS_CHANNEL_NAME) == ESP_OK &&
            nvs_erase_key(handle, NVS_BSSID_NAME) == ESP_OK) {
             
