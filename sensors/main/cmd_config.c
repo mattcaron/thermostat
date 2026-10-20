@@ -11,6 +11,7 @@
 #include "esp_attr.h"
 #include "esp_console.h"
 #include "argtable3/argtable3.h"
+#include "ap_cache_storage.h"
 #include "config_storage.h"
 #include "console.h"
 #include "wifi.h"
@@ -183,7 +184,9 @@ static void emit_set_help(void)
            "        network won't change while it is sleeping.\n"
            "        Disabling this will respond better to changes in network\n"
            "        topology, but will reduce battery life.\n"
-           "        In testing, this shortens connection times by about 300ms.\n");
+           "        In testing, this shortens connection times by about 300ms.\n"
+           "        Note that disabling this implicitly erases the cache,\n"
+           "        so toggling this value will trigger a cache reset.\n");
     printf("    " CONFIG_SET_USE_DHCP
            " = whether or not to use a DHCP client to acquire an IP address (Y or N).\n"
            "        Disabling this saves power because it doesn't need to reacquire\n"
@@ -332,6 +335,13 @@ static int handle_set(int argc, char **argv)
                 }
                 else if (argv[3][0] == 'N') {
                     new_config.cache_ap_info = false;
+                    printf("Deleting AP cache from NVS... ");
+                    if (delete_ap_cache_from_nvs()) {
+                        printf("Success!\n");
+                    }
+                    else {
+                        printf("Failure!\n");
+                    }
                     retval = 0;
                 }
                 else {
